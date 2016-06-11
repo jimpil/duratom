@@ -6,7 +6,7 @@ In order to provide durability `duratom` will persist its state to some durable-
  1. A file on the local file-system
  2. A postgres DB instance
 
-Note: Several ideas taken/adapted from [enduro](https://github.com/alandipert/enduro) 
+Note: Several ideas taken/adapted from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
 ## Usage
 The public API consists of a single constructor function (`duratom.core/duratom`). Once you have constructed a duratom object, you can use it just like a regular atom,
