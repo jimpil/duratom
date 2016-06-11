@@ -7,7 +7,7 @@ A durable atom type for Clojure. Duratom implements the same interfaces as the c
 In order to provide durability `duratom` will persist its state to some durable-backend on each mutation. The built-in backends are:
  
  1. A file on the local file-system
- 2. A postgres DB instance
+ 2. A postgres DB table
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
