@@ -17,6 +17,7 @@
     (-> dura
         (doto (swap! assoc :z 3))
         (doto (swap! dissoc :x)))
+
     (Thread/sleep 200)
     (is (= {:z 3 :y 2} @dura))
     (is (= {:z 3 :y 2} (-> rel-path slurp read-string)))
@@ -26,7 +27,6 @@
         (doto (swap!  (comp vec rest))))
 
     (Thread/sleep 200)
-
     (is (= [2 3] @dura))
     (is (= [2 3] (-> rel-path slurp read-string)))
 
@@ -58,6 +58,8 @@
       (-> dura
           (doto (swap! assoc :z 3))
           (doto (swap! dissoc :x)))
+
+      (Thread/sleep 200)
       (is (= {:z 3 :y 2} @dura))
       (is (= {:z 3 :y 2} (ut/get-value db-spec table-name)))
 
@@ -65,10 +67,13 @@
           (doto (reset! [1 2 3]))
           (doto (swap! (comp vec rest))))
 
+      (Thread/sleep 200)
       (is (= [2 3] @dura))
       (is (= [2 3] (ut/get-value db-spec table-name)))
 
       (destroy dura)
+
+      (Thread/sleep 200)
       (is (= [2 3] @dura))
       (is (thrown? AssertionError (swap! dura conj 4)))
       (is (false? (ut/table-exists? db-spec table-name)) "Table was NOT deleted!!!")

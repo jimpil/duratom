@@ -40,15 +40,15 @@
 ;;===================================<PGSQL>=====================================
 
 (defn- save-to-db! [db-config table-name state-atom]
-  (ut/update-or-insert! db-config table-name {:id 0 :value (pr-str @state-atom)} ["id = ?" 0]))
+  (ut/update-or-insert! db-config table-name {:id 0 :value (pr-str @state-atom)} ["id = ?" 0])
+  state-atom)
 
 (defrecord PGSQLBackend [config table-name committer]
   IStorageBackend
   (snapshot [_]
     (ut/get-value config table-name))
   (commit [_]
-    ;; no need to serialize commits through the agent - the DB does that for us
-    (save-to-db! config table-name @committer))
+    (send-off committer (partial save-to-db! config table-name)))
   (cleanup [_]
     (ut/delete-dedicated-table! config table-name)) ;;drop the whole table
   )
