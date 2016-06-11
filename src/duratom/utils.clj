@@ -5,7 +5,8 @@
   (:import (java.io PushbackReader)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
-           (java.util.concurrent.atomic AtomicBoolean)))
+           (java.util.concurrent.atomic AtomicBoolean)
+           (java.sql BatchUpdateException)))
 
 (defn read-edn-from-file!
   "Efficiently read large data structures from a stream."
@@ -61,16 +62,21 @@
         result))))
 
 (defn delete-dedicated-table! [config table-name]
-  (sql/db-do-commands config (sql/drop-table-ddl table-name)))
+  (try
+    (sql/db-do-commands config (sql/drop-table-ddl table-name))
+    (catch BatchUpdateException _ '(0)))) ;; table doesn't exist!
 
 (defn create-dedicated-table! [db-config table-name]
-  (sql/db-do-commands db-config (sql/create-table-ddl table-name [[:id :int] [:value :text]])))
+  (try
+    (sql/db-do-commands db-config (sql/create-table-ddl table-name [[:id :int] [:value :text]]))
+    (catch BatchUpdateException _ '(0)))) ;; table already exists!
 
 (defn get-value [db table-name]
   (sql/query db [(str "SELECT value FROM " table-name " LIMIT 1")]
              {:row-fn (comp edn/read-string :value)
-              :resultset-fn first}))
+              :result-set-fn first}))
 
 (defn table-exists? [db table-name]
   (sql/query db ["SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"]
-             {:resultset-fn #(some #{table-name} (map :table_name %))}))
+             {:row-fn :table_name
+              :result-set-fn #(some? (some #{table-name} %))}))

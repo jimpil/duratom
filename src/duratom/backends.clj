@@ -47,7 +47,8 @@
   (snapshot [_]
     (ut/get-value config table-name))
   (commit [_]
-    (send-off committer (partial save-to-db! config table-name)))
+    ;; no need to serialize commits through the agent - the DB does that for us
+    (save-to-db! config table-name @committer))
   (cleanup [_]
     (ut/delete-dedicated-table! config table-name)) ;;drop the whole table
   )
