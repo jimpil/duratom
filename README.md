@@ -1,4 +1,7 @@
 # Duratom
+<p align="center">
+  <img src="https://pbs.twimg.com/profile_images/681519713005006848/HgkHYOWb_400x400.png"/>
+</p>
 
 A durable atom type for Clojure. Duratom implements the same interfaces as the core Clojure atom (IAtom, IRef, IDeref), plus the `IDurable` protocol from `duratom.core`.
 In order to provide durability `duratom` will persist its state to some durable-backend on each mutation. The built-in backends are:
