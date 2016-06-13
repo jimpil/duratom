@@ -1,20 +1,21 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
             [clojure.edn :as edn]
-            [clojure.java.jdbc :as sql])
+            [clojure.java.jdbc :as sql]
+            [amazonica.aws.s3 :as aws])
   (:import (java.io PushbackReader)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
            (java.sql BatchUpdateException)))
 
-(defn read-edn-from-file!
+(defn read-edn!
   "Efficiently read large data structures from a stream."
   [filepath]
   (with-open [r (PushbackReader. (jio/reader filepath))]
     (edn/read r)))
 
-(defn write-edn-to-file!
+(defn write-edn!
   "Efficiently write large data structures to a stream."
   [data filepath]
   (with-open [w (jio/writer filepath)]
@@ -80,3 +81,22 @@
   (sql/query db ["SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"]
              {:row-fn :table_name
               :result-set-fn #(some? (some #{table-name} %))}))
+
+;; S3 utils
+
+(defn get-value-from-s3 [creds bucket key]
+  (-> (aws/get-object creds bucket key)
+      :input-stream
+      read-edn!))
+
+(defn store-value-to-s3 [creds bucket key value]
+  (let [str-val (pr-str value)]
+    (aws/put-object creds bucket key
+                    (jio/input-stream (.getBytes str-val))
+                    {:content-length (count str-val)})))
+
+(defn delete-object-from-s3 [credentials bucket k]
+  (aws/delete-object credentials bucket k))
+
+(defn does-s3-object-exists [creds bucket k]
+  (aws/does-object-exist creds bucket k))

@@ -1,6 +1,5 @@
 (ns duratom.backends
-  (:require [duratom.utils :as ut]
-            [clojure.java.io :as jio])
+  (:require [duratom.utils :as ut])
   (:import (java.io File IOException)))
 
 (defprotocol IStorageBackend
@@ -11,7 +10,7 @@
 ;; ===============================<LOCAL FILE>===========================================
 (defn- save-to-file! [path state-atom]
   (let [tmp-file-name (str path ".tmp")]
-    (ut/write-edn-to-file! @state-atom tmp-file-name) ;; write data to a temp file
+    (ut/write-edn! @state-atom tmp-file-name) ;; write data to a temp file
     (ut/move-file! tmp-file-name path)                ;; and rename it atomically
     state-atom))
 
@@ -22,7 +21,7 @@
       (if (.canWrite file)
         (let [file-length (.length file)
               empty-file? (zero? file-length)
-              contents (delay (ut/read-edn-from-file! path))]
+              contents (delay (ut/read-edn! path))]
           (when-not empty-file?
             (try (force contents)
                  (catch Exception e
@@ -51,4 +50,20 @@
     (send-off committer (partial save-to-db! config table-name)))
   (cleanup [_]
     (ut/delete-dedicated-table! config table-name)) ;;drop the whole table
+  )
+
+;;==========================<AMAZON-S3>=============================================
+
+(defn- save-to-s3! [credentials bucket k state-atom]
+  (ut/store-value-to-s3 credentials bucket k (pr-str @state-atom))
+  state-atom)
+
+(defrecord S3Backend [credentials bucket k committer]
+  IStorageBackend
+  (snapshot [_]
+    (ut/get-value-from-s3 credentials bucket k))
+  (commit [_]
+    (send-off committer (partial save-to-s3! credentials bucket k)))
+  (cleanup [_]
+    (ut/delete-object-from-s3 credentials bucket k)) ;;drop the whole object
   )

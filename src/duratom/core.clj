@@ -139,10 +139,23 @@
                                                  (do (ut/create-dedicated-table! db-config table-name)
                                                      table-name)))})))
 
+(defn s3-atom
+  ""
+  ([creds bucket k]
+   (s3-atom creds bucket k (ReentrantLock.) nil))
+  ([creds bucket k lock initial-value]
+   (map->Duratom {:lock lock
+                  :init initial-value
+                  :make-async-backend (fn [committer]
+                                        (if (ut/does-s3-object-exists creds bucket k)
+                                          (apply storage/->S3Backend [creds bucket k committer])
+                                          (do (ut/store-value-to-s3 creds bucket key initial-value)
+                                              (apply storage/->S3Backend [creds bucket k committer]))))})))
+
 
 (defmulti duratom
   "Top level constructor function for the <Duratom> class.
-   Built-in <backed-by> types are `:local-file` & `:postgres-db`."
+   Built-in <backed-by> types are `:local-file`, `:postgres-db` & `:aws-s3`."
   (fn [backed-by & _args]
     backed-by))
 
@@ -155,5 +168,10 @@
   [_ & {:keys [db-config table-name init lock]
         :or {lock (ReentrantLock.)}}]
   (postgres-atom db-config table-name lock init))
+
+(defmethod duratom :aws-s3
+  [_ & {:keys [credentials bucket key init lock]
+        :or {lock (ReentrantLock.)}}]
+  (s3-atom credentials bucket key lock init))
 
 
