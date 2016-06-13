@@ -72,7 +72,7 @@
     (sql/db-do-commands db-config (sql/create-table-ddl table-name [[:id :int] [:value :text]]))
     (catch BatchUpdateException _ '(0)))) ;; table already exists!
 
-(defn get-value [db table-name]
+(defn get-pgsql-value [db table-name]
   (sql/query db [(str "SELECT value FROM " table-name " LIMIT 1")]
              {:row-fn (comp edn/read-string :value)
               :result-set-fn first}))

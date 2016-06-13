@@ -45,7 +45,7 @@
 (defrecord PGSQLBackend [config table-name committer]
   IStorageBackend
   (snapshot [_]
-    (ut/get-value config table-name))
+    (ut/get-pgsql-value config table-name))
   (commit [_]
     (send-off committer (partial save-to-db! config table-name)))
   (cleanup [_]

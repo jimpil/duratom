@@ -61,7 +61,7 @@
 
       (Thread/sleep 200)
       (is (= {:z 3 :y 2} @dura))
-      (is (= {:z 3 :y 2} (ut/get-value db-spec table-name)))
+      (is (= {:z 3 :y 2} (ut/get-pgsql-value db-spec table-name)))
 
       (-> dura
           (doto (reset! [1 2 3]))
@@ -69,7 +69,7 @@
 
       (Thread/sleep 200)
       (is (= [2 3] @dura))
-      (is (= [2 3] (ut/get-value db-spec table-name)))
+      (is (= [2 3] (ut/get-pgsql-value db-spec table-name)))
 
       (destroy dura)
 
