@@ -11,8 +11,8 @@
 
 (defn read-edn!
   "Efficiently read large data structures from a stream."
-  [filepath]
-  (with-open [r (PushbackReader. (jio/reader filepath))]
+  [source]
+  (with-open [r (PushbackReader. (jio/reader source))]
     (edn/read r)))
 
 (defn write-edn!
@@ -93,7 +93,7 @@
   (let [str-val (pr-str value)]
     (aws/put-object creds bucket key
                     (jio/input-stream (.getBytes str-val))
-                    {:content-length (count str-val)})))
+                    {:content-length (.length str-val)})))
 
 (defn delete-object-from-s3 [credentials bucket k]
   (aws/delete-object credentials bucket k))
