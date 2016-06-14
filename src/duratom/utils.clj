@@ -62,9 +62,9 @@
         (sql/insert! t-conn table row)
         result))))
 
-(defn delete-dedicated-table! [config table-name]
+(defn delete-relevant-row! [config table-name row-id]
   (try
-    (sql/db-do-commands config (sql/drop-table-ddl table-name))
+    (sql/db-do-commands config (format "DELETE FROM %s WHERE id = %s" table-name row-id))
     (catch BatchUpdateException _ '(0)))) ;; table doesn't exist!
 
 (defn create-dedicated-table! [db-config table-name]

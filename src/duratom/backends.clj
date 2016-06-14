@@ -49,7 +49,7 @@
   (commit [_]
     (send-off committer (partial save-to-db! config table-name row-id)))
   (cleanup [_]
-    (ut/delete-dedicated-table! config table-name)) ;;drop the whole table
+    (ut/delete-relevant-row! config table-name row-id)) ;;drop the relevant row
   )
 
 ;;==========================<AMAZON-S3>=============================================

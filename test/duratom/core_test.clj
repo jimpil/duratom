@@ -76,8 +76,9 @@
                       (println "Transitioning from" old-state "to" new-state "...")))]
 
     ;; empty row first
-    (common* dura #(ut/get-pgsql-value db-spec table-name 0) #(ut/table-exists? db-spec table-name))
+    (common* dura #(ut/get-pgsql-value db-spec table-name 0) #(some? (ut/get-pgsql-value db-spec table-name 0)))
     ;; with-contents threafter
+    (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
     (common* (add-watch
                (duratom :postgres-db
                         :db-config db-spec
@@ -87,7 +88,7 @@
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))
              #(ut/get-pgsql-value db-spec table-name 0)
-             #(ut/table-exists? db-spec table-name))
+             #(some? (ut/get-pgsql-value db-spec table-name 0)))
     )
   )
 
