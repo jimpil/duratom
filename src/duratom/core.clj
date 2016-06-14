@@ -89,8 +89,9 @@
 ;; but also to provide printing that sort of resembles atoms
 (defmethod print-method Duratom [dura ^Writer w]
   (.write w "#")
-  (.write w (-> dura class pr-str))
-  (.write w "{:status :ready, :val ")
+  (.write w (-> dura class .getName))
+  (.write w (format " 0x%x " (System/identityHashCode dura)))
+  (.write w " {:status :ready, :val ")
   (.write w (-> dura :underlying-atom deref pr-str))
   (.write w "}")
   )
