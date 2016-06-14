@@ -120,7 +120,8 @@
                                                  (catch IOException exception
                                                    (throw (ex-info "Failed creating the file needed!"
                                                                    {:file-path file-path}
-                                                                   exception)))))})))
+                                                                   exception)))))
+                  })))
 
 
 
@@ -140,20 +141,25 @@
                                                  table-name
                                                  (do (ut/create-dedicated-table! db-config table-name)
                                                      table-name))
-                                               row-id)})))
+                                               row-id)
+                  })))
 
 (defn s3-atom
-  ""
+  "Creates and returns an S3-backed atom. If the location denoted by the combination of <bucket> and <k> exists,
+   it is read and becomes the initial value. Otherwise, the initial value is <init> and the bucket key <k> is updated."
   ([creds bucket k]
    (s3-atom creds bucket k (ReentrantLock.) nil))
   ([creds bucket k lock initial-value]
    (map->Duratom {:lock lock
                   :init initial-value
-                  :make-async-backend (fn [committer]
-                                        (if (ut/does-s3-object-exists creds bucket k)
-                                          (apply storage/->S3Backend [creds bucket k committer])
-                                          (do (ut/store-value-to-s3 creds bucket key initial-value)
-                                              (apply storage/->S3Backend [creds bucket k committer]))))})))
+                  :make-async-backend (partial storage/->S3Backend
+                                               creds
+                                               (if (ut/does-bucket-exist creds bucket)
+                                                 bucket
+                                                 (do (ut/create-s3-bucket creds bucket)
+                                                     bucket))
+                                               k)
+                  })))
 
 
 (defmulti duratom

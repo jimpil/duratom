@@ -84,19 +84,21 @@
 
 ;; S3 utils
 
-(defn get-value-from-s3 [creds bucket key]
-  (-> (aws/get-object creds bucket key)
+(defn create-s3-bucket [creds bucket-name]
+  (aws/create-bucket creds bucket-name))
+
+(defn get-value-from-s3 [creds bucket-name key]
+  (-> (aws/get-object creds bucket-name key)
       :input-stream
       read-edn!))
 
 (defn store-value-to-s3 [creds bucket key value]
-  (let [str-val (pr-str value)]
-    (aws/put-object creds bucket key
-                    (jio/input-stream (.getBytes str-val))
-                    {:content-length (.length str-val)})))
+  (let [str-val (pr-str value)
+        str-val-bytes (.getBytes str-val)]
+    (aws/put-object creds bucket key (jio/input-stream str-val-bytes) {:content-length (.length str-val)})))
 
-(defn delete-object-from-s3 [credentials bucket k]
-  (aws/delete-object credentials bucket k))
+(defn delete-object-from-s3 [credentials bucket-name k]
+  (aws/delete-object credentials bucket-name k))
 
-(defn does-s3-object-exists [creds bucket k]
-  (aws/does-object-exist creds bucket k))
+(defn does-bucket-exist [creds bucket-name]
+  (aws/does-bucket-exist creds bucket-name))
