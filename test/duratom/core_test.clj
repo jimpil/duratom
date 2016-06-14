@@ -4,6 +4,30 @@
             [clojure.java.io :as jio]
             [duratom.utils :as ut]))
 
+(defn- common* [dura peek-in-source exists?]
+  (-> dura
+      (doto (swap! assoc :z 3))
+      (doto (swap! dissoc :x)))
+
+  (Thread/sleep 200)
+  (is (= {:z 3 :y 2} @dura))
+  (is (= {:z 3 :y 2} (peek-in-source)))
+
+  (-> dura
+      (doto (reset! [1 2 3]))
+      (doto (swap!  (comp vec rest))))
+
+  (Thread/sleep 200)
+  (is (= [2 3] @dura))
+  (is (= [2 3] (peek-in-source)))
+
+  (destroy dura)
+  (Thread/sleep 200)
+  (is (= [2 3] @dura))
+  (is (thrown? AssertionError (swap! dura conj 4)))
+  (is (false? (exists?)) "Storage resurce was NOT deleted!!!")
+  )
+
 (deftest file-backed-tests
   (println "File-backed atom...")
   (let [rel-path "data_temp.txt"
@@ -14,29 +38,23 @@
                         :init init)
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))]
-    (-> dura
-        (doto (swap! assoc :z 3))
-        (doto (swap! dissoc :x)))
 
-    (Thread/sleep 200)
-    (is (= {:z 3 :y 2} @dura))
-    (is (= {:z 3 :y 2} (-> rel-path slurp read-string)))
-
-    (-> dura
-        (doto (reset! [1 2 3]))
-        (doto (swap!  (comp vec rest))))
-
-    (Thread/sleep 200)
-    (is (= [2 3] @dura))
-    (is (= [2 3] (-> rel-path slurp read-string)))
-
-    (destroy dura)
-    (Thread/sleep 200)
-    (is (= [2 3] @dura))
-    (is (thrown? AssertionError (swap! dura conj 4)))
-    (is (false? (.exists (jio/file rel-path))) "File was NOT deleted!!!")
-
-    ))
+    ;; empty file first
+    (common* dura
+             #(-> rel-path slurp read-string)
+             #(.exists (jio/file rel-path)))
+    ;; with-contents thereafter
+    (spit rel-path (pr-str init))
+    (common* (add-watch
+               (duratom :local-file
+                        :file-path rel-path
+                        :init init)
+               :log (fn [k r old-state new-state]
+                      (println "Transitioning from" old-state "to" new-state "...")))
+             #(-> rel-path slurp read-string)
+             #(.exists (jio/file rel-path)))
+    )
+  )
 
 
 (deftest postgres-backed-tests
@@ -56,28 +74,20 @@
                         :init init)
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))]
-      (-> dura
-          (doto (swap! assoc :z 3))
-          (doto (swap! dissoc :x)))
 
-      (Thread/sleep 200)
-      (is (= {:z 3 :y 2} @dura))
-      (is (= {:z 3 :y 2} (ut/get-pgsql-value db-spec table-name 0)))
-
-      (-> dura
-          (doto (reset! [1 2 3]))
-          (doto (swap! (comp vec rest))))
-
-      (Thread/sleep 200)
-      (is (= [2 3] @dura))
-      (is (= [2 3] (ut/get-pgsql-value db-spec table-name 0)))
-
-      (destroy dura)
-
-      (Thread/sleep 200)
-      (is (= [2 3] @dura))
-      (is (thrown? AssertionError (swap! dura conj 4)))
-      (is (false? (ut/table-exists? db-spec table-name)) "Table was NOT deleted!!!")
+    ;; empty row first
+    (common* dura #(ut/get-pgsql-value db-spec table-name 0) #(ut/table-exists? db-spec table-name))
+    ;; with-contents threafter
+    (common* (add-watch
+               (duratom :postgres-db
+                        :db-config db-spec
+                        :table-name table-name
+                        :row-id 0
+                        :init init)
+               :log (fn [k, r, old-state, new-state]
+                      (println "Transitioning from" old-state "to" new-state "...")))
+             #(ut/get-pgsql-value db-spec table-name 0)
+             #(ut/table-exists? db-spec table-name))
     )
   )
 
