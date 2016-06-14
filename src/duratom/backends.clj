@@ -38,16 +38,16 @@
 
 ;;===================================<PGSQL>=====================================
 
-(defn- save-to-db! [db-config table-name state-atom]
-  (ut/update-or-insert! db-config table-name {:id 0 :value (pr-str @state-atom)} ["id = ?" 0])
+(defn- save-to-db! [db-config table-name row-id state-atom]
+  (ut/update-or-insert! db-config table-name {:id row-id :value (pr-str @state-atom)} ["id = ?" row-id])
   state-atom)
 
-(defrecord PGSQLBackend [config table-name committer]
+(defrecord PGSQLBackend [config table-name row-id committer]
   IStorageBackend
   (snapshot [_]
-    (ut/get-pgsql-value config table-name))
+    (ut/get-pgsql-value config table-name row-id))
   (commit [_]
-    (send-off committer (partial save-to-db! config table-name)))
+    (send-off committer (partial save-to-db! config table-name row-id)))
   (cleanup [_]
     (ut/delete-dedicated-table! config table-name)) ;;drop the whole table
   )

@@ -128,8 +128,10 @@
   "Creates and returns a PostgreSQL-backed atom. If the location denoted by the combination of <db-config> and <table-name> exists,
    it is read and becomes the initial value. Otherwise, the initial value is <init> and the table <table-name> is updated."
   ([db-config table-name]
-   (postgres-atom db-config table-name (ReentrantLock.) nil))
-  ([db-config table-name lock initial-value]
+   (postgres-atom db-config table-name 0 (ReentrantLock.) nil))
+  ([db-config table-name row-id]
+   (postgres-atom db-config table-name row-id (ReentrantLock.) nil))
+  ([db-config table-name row-id lock initial-value]
    (map->Duratom {:lock lock
                   :init initial-value
                   :make-async-backend (partial storage/->PGSQLBackend
@@ -137,7 +139,8 @@
                                                (if (ut/table-exists? db-config table-name)
                                                  table-name
                                                  (do (ut/create-dedicated-table! db-config table-name)
-                                                     table-name)))})))
+                                                     table-name))
+                                               row-id)})))
 
 (defn s3-atom
   ""
@@ -165,9 +168,9 @@
   (file-atom file-path lock init))
 
 (defmethod duratom :postgres-db
-  [_ & {:keys [db-config table-name init lock]
+  [_ & {:keys [db-config table-name row-id init lock]
         :or {lock (ReentrantLock.)}}]
-  (postgres-atom db-config table-name lock init))
+  (postgres-atom db-config table-name row-id lock init))
 
 (defmethod duratom :aws-s3
   [_ & {:keys [credentials bucket key init lock]

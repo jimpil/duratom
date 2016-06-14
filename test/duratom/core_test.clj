@@ -52,6 +52,7 @@
                (duratom :postgres-db
                         :db-config db-spec
                         :table-name table-name
+                        :row-id 0
                         :init init)
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))]
@@ -61,7 +62,7 @@
 
       (Thread/sleep 200)
       (is (= {:z 3 :y 2} @dura))
-      (is (= {:z 3 :y 2} (ut/get-pgsql-value db-spec table-name)))
+      (is (= {:z 3 :y 2} (ut/get-pgsql-value db-spec table-name 0)))
 
       (-> dura
           (doto (reset! [1 2 3]))
@@ -69,7 +70,7 @@
 
       (Thread/sleep 200)
       (is (= [2 3] @dura))
-      (is (= [2 3] (ut/get-pgsql-value db-spec table-name)))
+      (is (= [2 3] (ut/get-pgsql-value db-spec table-name 0)))
 
       (destroy dura)
 
