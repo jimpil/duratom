@@ -4,8 +4,8 @@
             [clojure.java.io :as jio])
   (:import (clojure.lang IAtom IDeref IRef ARef)
            (java.util.concurrent.locks ReentrantLock)
-           (java.io IOException)
-           (clojure.lang ARef)))
+           (java.io IOException Writer)
+           (clojure.lang ARef IFn$D)))
 
 (defmacro ^:private maybe-lock [lock & body]
   (if lock
@@ -83,6 +83,16 @@
   IDeref
   (deref [_]
     @underlying-atom)
+  )
+
+;; override default `print-method` for records in order to hide certain fields,
+;; but also to provide printing that sort of resembles atoms
+(defmethod print-method Duratom [dura ^Writer w]
+  (.write w "#")
+  (.write w (-> dura class pr-str))
+  (.write w "{:status :ready, :val ")
+  (.write w (-> dura :underlying-atom deref pr-str))
+  (.write w "}")
   )
 
 

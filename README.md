@@ -14,7 +14,7 @@ Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alan
 
 Main difference between `duratom` & `enduro` is that an `enduro` atom is not a drop-in replacement for regular clojure atoms. In particular:
   
-  1. it doesn't implement all the same interfaces as regular clojure atoms (as of Clojure 1.8). As a result it comes with its own `swap!` & `reset!` implementations.
+  1. it doesn't implement all the same interfaces as regular clojure atoms. As a result it comes with its own `swap!` & `reset!` implementations.
   2. it requires the watches/validators to be provided in atoms upon construction.  
 
 Main difference between `duratom` & `durable-atom` is that a `durable-atom` atom doesn't have a second level of polymorphism to accommodate for switching storage backends. It assumes that a file-backed atom is always what you want. Moreover, it uses `slurp` & `spit` for reading/writing to the disk, which, in practice, puts a limit on how big data-structures you can fit in a String (depending on your hardware & JVM configuration of course). Finally, it uses `locking` which is problematic on some JVMs (e.g. certain IBM JVM versions). `duratom` uses the `java.util.concurrent.locks.Lock` interface instead.
