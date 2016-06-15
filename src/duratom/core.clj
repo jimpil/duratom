@@ -24,8 +24,7 @@
   (write_out [_]
     (storage/commit storage-backend))
   (read_in [this]
-    ;; reset the underlying atom directly to avoid writing exactly what was read in
-    (reset! underlying-atom (storage/snapshot storage-backend)))
+    (storage/snapshot storage-backend))
   (destroy [_]
     (storage/cleanup storage-backend)
     (release true)) ;; the only place where this is called with an argument
@@ -104,11 +103,12 @@
               (nil? lock))
           "The <lock> provided is neither a valid implementation of `java.util.concurrent.locks.Lock`, nor nil!")
   (let [raw-atom (atom nil)
-        backend (make-backend (agent raw-atom))
-        duratom (Duratom. backend raw-atom lock (ut/releaser))
+        duratom (Duratom. (make-backend (agent raw-atom)) raw-atom lock (ut/releaser))
         storage-init (read_in duratom)]
-    (if (some? storage-init) ;; found stuff
-      duratom
+    (if (some? storage-init) ;; found stuff - sync it
+      (do ;; reset the raw atom directly to avoid writing exactly what was read in
+        (reset! raw-atom storage-init)
+        duratom)
       (cond-> duratom
               (some? init) (doto (reset! init)))))) ;; empty storage means we start off with <initial-value>
 
