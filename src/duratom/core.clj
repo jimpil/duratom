@@ -82,7 +82,7 @@
   )
 
 
-(defn- ->Duratom ;; shadow the generated constructor-fns
+(defn- ->Duratom
   [make-backend lock init]
   (assert (or (ut/lock? lock)
               (nil? lock))
