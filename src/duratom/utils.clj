@@ -73,7 +73,7 @@
     (catch BatchUpdateException _ '(0)))) ;; table already exists!
 
 (defn get-pgsql-value [db table-name row-id]
-  (sql/query db [(str "SELECT value FROM " table-name " WHERE id = " row-id)]
+  (sql/query db [(str "SELECT value FROM " table-name " WHERE id = " row-id " LIMIT 1")]
              {:row-fn (comp edn/read-string :value)
               :result-set-fn first}))
 
