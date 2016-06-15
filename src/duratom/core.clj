@@ -86,7 +86,7 @@
   )
 
 ;; override default `print-method` for records in order to hide certain fields,
-;; but also to provide printing that sort of resembles atoms
+;; but also to provide printing which resembles atoms
 (defmethod print-method Duratom [dura ^Writer w]
   (.write w "#")
   (.write w (-> dura class .getName))
@@ -98,11 +98,12 @@
 
 
 (defn- ->Duratom ;; shadow the generated constructor-fns
-  [make-async-backend lock init]
+  [make-backend lock init]
   (assert (or (ut/lock? lock)
-              (nil? lock)) "The <lock> provided is neither a valid implementation of `java.util.concurrent.locks.Lock`, nor nil!")
+              (nil? lock))
+          "The <lock> provided is neither a valid implementation of `java.util.concurrent.locks.Lock`, nor nil!")
   (let [raw-atom (atom nil)
-        backend (make-async-backend (agent raw-atom))
+        backend (make-backend (agent raw-atom))
         duratom (Duratom. backend raw-atom lock (ut/releaser))
         storage-init (doto duratom read_in)]
     (if (some? @storage-init) ;; found stuff
@@ -111,8 +112,8 @@
               (some? init) (doto (reset! init)))))) ;; empty storage means we start off with <initial-value>
 
 (defn- map->Duratom [m]
-  (let [[make-async-backend lock initial-value] ((juxt :make-async-backend :lock :init) m)]
-    (->Duratom make-async-backend lock initial-value)))
+  (let [[make-backend lock initial-value] ((juxt :make-backend :lock :init) m)]
+    (->Duratom make-backend lock initial-value)))
 
 
 ;;==================<PUBLIC API>==========================
@@ -124,14 +125,14 @@
   ([file-path lock initial-value]
    (map->Duratom {:lock lock ;; allow for explicit nil
                   :init initial-value
-                  :make-async-backend (partial storage/->FileBackend
-                                               (try
-                                                 (doto (jio/file file-path)
-                                                   (.createNewFile))
-                                                 (catch IOException exception
-                                                   (throw (ex-info "Failed creating the file needed!"
-                                                                   {:file-path file-path}
-                                                                   exception)))))
+                  :make-backend (partial storage/->FileBackend
+                                         (try
+                                           (doto (jio/file file-path)
+                                             (.createNewFile))
+                                           (catch IOException exception
+                                             (throw (ex-info "Failed creating the file needed!"
+                                                             {:file-path file-path}
+                                                             exception)))))
                   })))
 
 
@@ -146,13 +147,13 @@
   ([db-config table-name row-id lock initial-value]
    (map->Duratom {:lock lock
                   :init initial-value
-                  :make-async-backend (partial storage/->PGSQLBackend
-                                               db-config
-                                               (if (ut/table-exists? db-config table-name)
-                                                 table-name
-                                                 (do (ut/create-dedicated-table! db-config table-name)
-                                                     table-name))
-                                               row-id)
+                  :make-backend (partial storage/->PGSQLBackend
+                                         db-config
+                                         (if (ut/table-exists? db-config table-name)
+                                           table-name
+                                           (do (ut/create-dedicated-table! db-config table-name)
+                                               table-name))
+                                         row-id)
                   })))
 
 (defn s3-atom
@@ -163,13 +164,13 @@
   ([creds bucket k lock initial-value]
    (map->Duratom {:lock lock
                   :init initial-value
-                  :make-async-backend (partial storage/->S3Backend
-                                               creds
-                                               (if (ut/does-bucket-exist creds bucket)
-                                                 bucket
-                                                 (do (ut/create-s3-bucket creds bucket)
-                                                     bucket))
-                                               k)
+                  :make-backend (partial storage/->S3Backend
+                                         creds
+                                         (if (ut/does-bucket-exist creds bucket)
+                                           bucket
+                                           (do (ut/create-s3-bucket creds bucket)
+                                               bucket))
+                                         k)
                   })))
 
 
