@@ -15,11 +15,6 @@
 (deftype Duratom
   [storage-backend underlying-atom lock release]
 
-  storage/IStorageBackend
-  (cleanup [_]
-    (storage/cleanup storage-backend)
-    (release true)) ;; the only place where this is called with an argument
-
   IAtom
   (swap [_ f]
     (ut/assert-not-released! release)
@@ -82,7 +77,7 @@
   (.write w (-> dura class .getName))
   (.write w (format " 0x%x " (System/identityHashCode dura)))
   (.write w " {:status :ready, :val ")
-  (.write w (-> dura :underlying-atom deref pr-str))
+  (.write w (-> (.-underlying_atom dura) deref pr-str))
   (.write w "}")
   )
 
@@ -114,7 +109,10 @@
   "Convenience fn for cleaning up the persistent storage of a duratom.
   In absence of this fn, one would have to go via `duratom.backends`."
   [^Duratom dura]
-  (.cleanup dura))
+  (let [storage (.-storage_backend dura)
+        release (.-release dura)]
+    (storage/cleanup storage)
+    (release true)))
 
 
 (defn file-atom
