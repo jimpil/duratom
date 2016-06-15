@@ -17,7 +17,7 @@
   (destroy [this]))
 
 
-(defrecord Duratom
+(deftype Duratom
   [storage-backend underlying-atom lock release]
   IDurable ;; 2 polymorphic levels here
   (write_out [_]
@@ -67,7 +67,7 @@
         (write_out this)
         result)))
   IRef
-  (setValidator [this validator]
+  (setValidator [_ validator]
     (set-validator! underlying-atom validator))
   (getValidator [_]
     (get-validator underlying-atom))
@@ -84,8 +84,7 @@
     @underlying-atom)
   )
 
-;; override default `print-method` for records in order to hide certain fields,
-;; but also to provide printing which resembles atoms
+;; provide a `print-method` that resembles Clojure atoms
 (defmethod print-method Duratom [dura ^Writer w]
   (.write w "#")
   (.write w (-> dura class .getName))
