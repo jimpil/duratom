@@ -7,8 +7,8 @@ A durable atom type for Clojure. Duratom implements the same interfaces as the c
 In order to provide durability `duratom` will persist its state to some durable-backend on each mutation. The built-in backends are:
  
  1. A file on the local file-system
- 2. A postgres DB row
- 3. An AWS-S3 key 
+ 2. A postgres DB table row
+ 3. An AWS-S3 bucket key 
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
@@ -52,7 +52,9 @@ The initial-value <init> is ignored, unless the underlying persistent storage is
 If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom` & `s3-atom` equivalents.
 
 ## Requirements
-Clojure 1.8 
+Java >= 1.7
+Clojure >= 1.7
+clojure.java.jdbc >= 0.6.0
 
 ## License
 
