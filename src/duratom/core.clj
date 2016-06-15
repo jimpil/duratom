@@ -24,7 +24,8 @@
   (write_out [_]
     (storage/commit storage-backend))
   (read_in [this]
-    (reset! this (storage/snapshot storage-backend)))
+    ;; reset the underlying atom directly to avoid writing exactly what was read in
+    (reset! underlying-atom (storage/snapshot storage-backend)))
   (destroy [_]
     (storage/cleanup storage-backend)
     (release true)) ;; the only place where this is called with an argument
@@ -105,10 +106,10 @@
   (let [raw-atom (atom nil)
         backend (make-backend (agent raw-atom))
         duratom (Duratom. backend raw-atom lock (ut/releaser))
-        storage-init (doto duratom read_in)]
-    (if (some? @storage-init) ;; found stuff
-      storage-init
-      (cond-> storage-init
+        storage-init (read_in duratom)]
+    (if (some? storage-init) ;; found stuff
+      duratom
+      (cond-> duratom
               (some? init) (doto (reset! init)))))) ;; empty storage means we start off with <initial-value>
 
 (defn- map->Duratom [m]
