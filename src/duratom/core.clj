@@ -11,60 +11,52 @@
     `(ut/with-locking ~lock ~@body)
     `(do ~@body)))
 ;; ================================================================
-(defprotocol IDurable
-  (write_out [this])
-  (read_in [this])
-  (destroy [this]))
-
 
 (deftype Duratom
   [storage-backend underlying-atom lock release]
-  IDurable ;; 2 polymorphic levels here
-  (write_out [_]
-    (storage/commit storage-backend))
-  (read_in [this]
-    (storage/snapshot storage-backend))
-  (destroy [_]
+
+  storage/IStorageBackend
+  (cleanup [_]
     (storage/cleanup storage-backend)
     (release true)) ;; the only place where this is called with an argument
 
   IAtom
-  (swap [this f]
+  (swap [_ f]
     (ut/assert-not-released! release)
     (maybe-lock lock
       (let [result (swap! underlying-atom f)]
-        (write_out this)
+        (storage/commit storage-backend)
         result)))
-  (swap [this f arg]
+  (swap [_ f arg]
     (ut/assert-not-released! release)
     (maybe-lock lock
       (let [result (swap! underlying-atom f arg)]
-        (write_out this)
+        (storage/commit storage-backend)
         result)))
-  (swap [this f arg1 arg2]
+  (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (maybe-lock lock
       (let [result (swap! underlying-atom f arg1 arg2)]
-        (write_out this)
+        (storage/commit storage-backend)
         result)))
-  (swap [this f x y args]
+  (swap [_ f x y args]
     (ut/assert-not-released! release)
     (maybe-lock lock
       (let [result (swap! underlying-atom f x y args)]
-        (write_out this)
+        (storage/commit storage-backend)
         result)))
-  (compareAndSet [this oldv newv]
+  (compareAndSet [_ oldv newv]
     (ut/assert-not-released! release)
     (maybe-lock lock
       (let [result (compare-and-set! underlying-atom oldv newv)]
         (when result
-          (write_out this))
+          (storage/commit storage-backend))
         result)))
-  (reset [this newval]
+  (reset [_ newval]
     (ut/assert-not-released! release)
     (maybe-lock lock
       (let [result (reset! underlying-atom newval)]
-        (write_out this)
+        (storage/commit storage-backend)
         result)))
   IRef
   (setValidator [_ validator]
@@ -101,8 +93,9 @@
               (nil? lock))
           "The <lock> provided is neither a valid implementation of `java.util.concurrent.locks.Lock`, nor nil!")
   (let [raw-atom (atom nil)
-        duratom (Duratom. (make-backend (agent raw-atom)) raw-atom lock (ut/releaser))
-        storage-init (read_in duratom)]
+        backend (make-backend (agent raw-atom))
+        duratom (Duratom. backend raw-atom lock (ut/releaser))
+        storage-init (storage/snapshot backend)]
     (if (some? storage-init) ;; found stuff - sync it
       (do ;; reset the raw atom directly to avoid writing exactly what was read in
         (reset! raw-atom storage-init)
