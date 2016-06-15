@@ -1,13 +1,21 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
-            [clojure.edn :as edn]
-            [clojure.java.jdbc :as sql]
-            [amazonica.aws.s3 :as aws])
+            [clojure.edn :as edn])
   (:import (java.io PushbackReader)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
            (java.sql BatchUpdateException)))
+
+(try
+  (require '[clojure.java.jdbc :as sql])
+  (catch Exception e
+    (require '[duratom.not-found.jdbc :as sql])))
+
+(try
+  (require '[amazonica.aws.s3 :as aws])
+  (catch Exception e
+    (require '[duratom.not-found.s3 :as aws])))
 
 (defn read-edn!
   "Efficiently read large data structures from a stream."

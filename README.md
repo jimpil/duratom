@@ -52,9 +52,14 @@ The initial-value <init> is ignored, unless the underlying persistent storage is
 If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom` & `s3-atom` equivalents.
 
 ## Requirements
+
+###Mandatory
 Java >= 1.7
 Clojure >= 1.7
-clojure.java.jdbc >= 0.6.0
+
+###Optional
+[clojure.java.jdbc](https://github.com/clojure/java.jdbc) >= 0.6.0  
+[amazonica](https://github.com/mcohen01/amazonica)
 
 ## License
 
