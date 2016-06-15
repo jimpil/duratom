@@ -109,6 +109,14 @@
 
 
 ;;==================<PUBLIC API>==========================
+
+(defn destroy
+  "Convenience fn for cleaning up the persistent storage of a duratom.
+  In absence of this fn, one would have to go via `duratom.backends`."
+  [^Duratom dura]
+  (.cleanup dura))
+
+
 (defn file-atom
   "Creates and returns a file-backed atom (on the local filesystem). If the file exists,
    it is read and becomes the initial value. Otherwise, the initial value is <init> and the file <file-path> is updated."
