@@ -3,7 +3,7 @@
             [duratom.utils :as ut]
             [clojure.java.io :as jio])
   (:import (clojure.lang IAtom IDeref IRef ARef)
-           (java.util.concurrent.locks ReentrantLock)
+           (java.util.concurrent.locks ReentrantLock Lock)
            (java.io IOException Writer)))
 
 (defmacro ^:private maybe-lock [lock & body]
@@ -13,7 +13,7 @@
 ;; ================================================================
 
 (deftype Duratom
-  [storage-backend underlying-atom lock release]
+  [storage-backend underlying-atom ^Lock lock release]
 
   IAtom
   (swap [_ f]
@@ -72,7 +72,7 @@
   )
 
 ;; provide a `print-method` that resembles Clojure atoms
-(defmethod print-method Duratom [dura ^Writer w]
+(defmethod print-method Duratom [^Duratom dura ^Writer w]
   (.write w "#")
   (.write w (-> dura class .getName))
   (.write w (format " 0x%x " (System/identityHashCode dura)))
