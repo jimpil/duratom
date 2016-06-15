@@ -4,8 +4,7 @@
             [clojure.java.io :as jio])
   (:import (clojure.lang IAtom IDeref IRef ARef)
            (java.util.concurrent.locks ReentrantLock)
-           (java.io IOException Writer)
-           (clojure.lang ARef IFn$D)))
+           (java.io IOException Writer)))
 
 (defmacro ^:private maybe-lock [lock & body]
   (if lock

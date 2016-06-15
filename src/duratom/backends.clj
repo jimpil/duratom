@@ -11,7 +11,7 @@
 (defn- save-to-file! [path state-atom]
   (let [tmp-file-name (str path ".tmp")]
     (ut/write-edn! @state-atom tmp-file-name) ;; write data to a temp file
-    (ut/move-file! tmp-file-name path)                ;; and rename it atomically
+    (ut/move-file! tmp-file-name path)        ;; and move it atomically
     state-atom))
 
 (defrecord FileBackend [^File file committer]
