@@ -106,8 +106,7 @@
 ;;==================<PUBLIC API>==========================
 
 (defn destroy
-  "Convenience fn for cleaning up the persistent storage of a duratom.
-  In absence of this fn, one would have to go via `duratom.backends`."
+  "Convenience fn for cleaning up the persistent storage of a duratom."
   [^Duratom dura]
   (let [storage (.-storage_backend dura)
         release (.-release dura)]

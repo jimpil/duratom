@@ -19,15 +19,12 @@
   (snapshot [_]
     (let [path (.getPath file)]
       (if (.canWrite file)
-        (let [file-length (.length file)
-              empty-file? (zero? file-length)
-              contents (delay (ut/read-edn! path))]
-          (when-not empty-file?
-            (try (force contents)
-                 (catch Exception e
-                   (throw (ex-info (str "Unable to read data from file " path "!")
-                                   {:file-path path}
-                                   e))))))
+        (when-not (zero? (.length file))
+          (try (ut/read-edn! path)
+               (catch Exception e
+                 (throw (ex-info (str "Unable to read data from file " path "!")
+                                 {:file-path path}
+                                 e)))))
         (throw (ex-info "The file backing the duratom must be writeable!" {:file-path path})))))
   (commit [_]
     (send-off committer (partial save-to-file! (.getPath file))))
