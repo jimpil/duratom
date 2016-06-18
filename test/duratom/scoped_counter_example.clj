@@ -29,16 +29,16 @@
        (into [])))
 
 (defn generate!
-  [[start end :as scope] step dura]
+  [end step dura]
   (if-let [v (peek @dura)]
     (do (swap! dura pop)
         v)
-    (do
+    (let [start (-> dura meta :service-id)]
       (println dura  "has run out of values => wrapping round...")
       (reset! dura (scoped-seq start end step))
-      (recur scope step dura))))
+      (recur end step dura))))
 
-(defn demo [n-services [start end :as scope]]
+(defn demo [n-services [start end]]
   (let [services (mock-services n-services)
         service-ids (->> services
                          (map (comp str last :id))
@@ -48,14 +48,16 @@
                                 (take n-services)
                                 (map #(scoped-seq % end n-services)))
         duratoms (map (fn [id init-range]
-                        (core/duratom :postgres-db
-                                      :db-config DB-SPEC
-                                      :table-name "atom_state"
-                                      :row-id (Long/parseLong id)
-                                      :init init-range))
+                        (let [num-id (Long/parseLong id)]
+                          (-> (core/duratom :postgres-db
+                                            :db-config DB-SPEC
+                                            :table-name "atom_state"
+                                            :row-id num-id
+                                            :init init-range)
+                              (with-meta {:service-id num-id}))))
                       service-ids
                       init-scoped-ranges)
-        generate (partial generate! scope n-services)]
+        generate (partial generate! end n-services)]
     ;; unleash them all!
     (dotimes [_ 15]
       (doall (pmap #(do (println (generate %))

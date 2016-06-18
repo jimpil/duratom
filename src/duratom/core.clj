@@ -2,7 +2,7 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio])
-  (:import (clojure.lang IAtom IDeref IRef ARef)
+  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io IOException Writer)))
 
@@ -13,7 +13,7 @@
 ;; ================================================================
 
 (deftype Duratom
-  [storage-backend underlying-atom ^Lock lock release]
+  [storage-backend underlying-atom ^Lock lock release _meta]
 
   IAtom
   (swap [_ f]
@@ -69,6 +69,12 @@
   IDeref
   (deref [_]
     @underlying-atom)
+  IObj
+  (withMeta [_ meta-map]
+    (Duratom. storage-backend underlying-atom ^Lock lock release meta-map))
+  IMeta
+  (meta [_]
+    _meta)
   )
 
 ;; provide a `print-method` that resembles Clojure atoms
@@ -89,10 +95,10 @@
           "The <lock> provided is neither a valid implementation of `java.util.concurrent.locks.Lock`, nor nil!")
   (let [raw-atom (atom nil)
         backend (make-backend (agent raw-atom))
-        duratom (Duratom. backend raw-atom lock (ut/releaser))
+        duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
         storage-init (storage/snapshot backend)]
     (if (some? storage-init) ;; found stuff - sync it
-      (do ;; reset the raw atom directly to avoid writing exactly what was read in
+      (do ;; reset the raw atom directly to avoid writing exactly what was read
         (reset! raw-atom storage-init)
         duratom)
       (cond-> duratom
