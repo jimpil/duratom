@@ -34,7 +34,7 @@
     (do (swap! dura pop)
         v)
     (let [start (-> dura meta :service-id)]
-      (println dura  "has run out of values => wrapping round...")
+      (println  (format "Service %s has run out of values => wrapping round..." start))
       (reset! dura (scoped-seq start end step))
       (recur end step dura))))
 
@@ -60,8 +60,8 @@
         generate (partial generate! end n-services)]
     ;; unleash them all!
     (dotimes [_ 15]
-      (doall (pmap #(do (println (generate %))
-                        (Thread/sleep (rand-int 1000)))
+      (doall (pmap #(do (Thread/sleep (rand-int 1000))
+                        (println (generate %)))
                    duratoms)))
 
     (doall (pmap core/destroy duratoms))
