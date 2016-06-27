@@ -2,7 +2,7 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio])
-  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj)
+  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io IOException Writer)))
 
@@ -13,62 +13,62 @@
 ;; ================================================================
 
 (deftype Duratom
-  [storage-backend underlying-atom ^Lock lock release _meta]
+  [storage-backend ^Atom underlying-atom ^Lock lock release _meta]
 
   IAtom
   (swap [_ f]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (swap! underlying-atom f)]
+      (let [result (.swap underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (swap! underlying-atom f arg)]
+      (let [result (.swap underlying-atom f arg)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (swap! underlying-atom f arg1 arg2)]
+      (let [result (.swap underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f x y args]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (swap! underlying-atom f x y args)]
+      (let [result (.swap underlying-atom f x y args)]
         (storage/commit storage-backend)
         result)))
   (compareAndSet [_ oldv newv]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (compare-and-set! underlying-atom oldv newv)]
+      (let [result (.compareAndSet underlying-atom oldv newv)]
         (when result
           (storage/commit storage-backend))
         result)))
   (reset [_ newval]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (reset! underlying-atom newval)]
+      (let [result (.reset underlying-atom newval)]
         (storage/commit storage-backend)
         result)))
   IRef
   (setValidator [_ validator]
-    (set-validator! underlying-atom validator))
+    (.setValidator underlying-atom validator))
   (getValidator [_]
-    (get-validator underlying-atom))
+    (.getValidator underlying-atom))
   (addWatch [this watch-key watch-fn]
-    (add-watch underlying-atom watch-key watch-fn)
+    (.addWatch underlying-atom watch-key watch-fn)
     this)
   (removeWatch [this watch-key]
-    (remove-watch underlying-atom watch-key)
+    (.removeWatch underlying-atom watch-key)
     this)
   (getWatches [_]
     (.getWatches ^ARef underlying-atom))
   IDeref
   (deref [_]
-    @underlying-atom)
+    (.deref underlying-atom))
   IObj
   (withMeta [_ meta-map]
     (Duratom. storage-backend underlying-atom ^Lock lock release meta-map))
