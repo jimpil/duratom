@@ -6,10 +6,12 @@
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io IOException Writer)))
 
-(defmacro ^:private maybe-lock [lock & body]
-  (if lock
-    `(ut/with-locking ~lock ~@body)
-    `(do ~@body)))
+(defmacro ^:private maybe-lock
+  "If your backend is a DB - that has its own lock"
+  [lock & body]
+  `(if-let [l# ~lock]
+     (ut/with-locking l# ~@body)
+     (do ~@body)))
 ;; ================================================================
 
 (deftype Duratom
@@ -129,13 +131,13 @@
    (map->Duratom {:lock lock ;; allow for explicit nil
                   :init initial-value
                   :make-backend (partial storage/->FileBackend
-                                         (try
-                                           (doto (jio/file file-path)
-                                             (.createNewFile))
-                                           (catch IOException exception
-                                             (throw (ex-info "Failed creating the file needed!"
-                                                             {:file-path file-path}
-                                                             exception)))))
+                                  (try
+                                    (doto (jio/file file-path)
+                                          (.createNewFile))
+                                    (catch IOException exception
+                                      (throw (ex-info "Error creating the required file on the file-system!"
+                                                      {:file-path file-path}
+                                                      exception)))))
                   })))
 
 

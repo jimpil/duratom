@@ -25,7 +25,7 @@
                  (throw (ex-info (str "Unable to read data from file " path "!")
                                  {:file-path path}
                                  e)))))
-        (throw (ex-info "The file backing the duratom must be writeable!" {:file-path path})))))
+        (throw (ex-info "The file backing the duratom MUST be writeable!" {:file-path path})))))
   (commit [_]
     (send-off committer (partial save-to-file! (.getPath file))))
   (cleanup [_]

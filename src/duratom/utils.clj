@@ -1,7 +1,7 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
             [clojure.edn :as edn])
-  (:import (java.io PushbackReader)
+  (:import (java.io PushbackReader BufferedWriter)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
@@ -27,8 +27,8 @@
   "Efficiently write large data structures to a stream."
   [data filepath]
   (with-open [w (jio/writer filepath)]
-    (binding [*out* w]
-      (pr data))))
+    (.write ^BufferedWriter w
+            (pr-str data))))
 
 (defn move-file!
   [source target]
