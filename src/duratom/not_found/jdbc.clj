@@ -1,8 +1,9 @@
 (ns duratom.not-found.jdbc)
 
-(defn with-db-transaction [bs & body]
-  (throw (UnsupportedOperationException.
-           "DB backend requires that you have `clojure.java.jdbc` on your classpath...")))
+(defmacro with-db-transaction [bs & body]
+  `(let ~bs
+     (throw (UnsupportedOperationException.
+              "DB backend requires that you have `clojure.java.jdbc` on your classpath..."))))
 
 (defn update!
   [db table row where-clause]
