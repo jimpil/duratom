@@ -30,12 +30,15 @@
     (.write ^BufferedWriter w
             (pr-str data))))
 
+(def move-opts
+  (into-array [StandardCopyOption/ATOMIC_MOVE
+               StandardCopyOption/REPLACE_EXISTING]))
+
 (defn move-file!
   [source target]
   (Files/move (.toPath (jio/file source))
               (.toPath (jio/file target))
-              (into-array [StandardCopyOption/ATOMIC_MOVE
-                           StandardCopyOption/REPLACE_EXISTING])))
+              move-opts))
 
 (defn releaser []
   (let [released? (AtomicBoolean. false)]
@@ -77,7 +80,8 @@
 
 (defn create-dedicated-table! [db-config table-name]
   (try
-    (sql/db-do-commands db-config (sql/create-table-ddl table-name [[:id :int] [:value :text]]))
+    (sql/db-do-commands db-config (sql/create-table-ddl table-name
+                                                        [[:id :int] [:value :text]]))
     (catch BatchUpdateException _ '(0)))) ;; table already exists!
 
 (defn get-pgsql-value [db table-name row-id]
@@ -103,7 +107,9 @@
 (defn store-value-to-s3 [creds bucket key value]
   (let [str-val (pr-str value)
         str-val-bytes (.getBytes str-val)]
-    (aws/put-object creds bucket key (jio/input-stream str-val-bytes) {:content-length (.length str-val)})))
+    (aws/put-object creds bucket key
+                    (jio/input-stream str-val-bytes)
+                    {:content-length (.length str-val)})))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
