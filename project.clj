@@ -1,4 +1,4 @@
-(defproject duratom "0.3.3"
+(defproject adikteev/duratom "0.3.3"
   :description "A durable atom type for Clojure."
   :url "https://github.com/jimpil/duratom"
   :license {:name "Eclipse Public License"
@@ -8,4 +8,6 @@
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
                                   [amazonica "0.3.58"]]}}
   ;:aot :all
+  :lein-release {:deploy-via :clojars}
+
   )
