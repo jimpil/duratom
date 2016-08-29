@@ -8,4 +8,6 @@
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
                                   [amazonica "0.3.58"]]}}
   ;:aot :all
+  :lein-release {:deploy-via :clojars}
+
   )
