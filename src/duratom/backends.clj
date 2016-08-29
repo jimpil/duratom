@@ -52,7 +52,7 @@
 ;;==========================<AMAZON-S3>=============================================
 
 (defn- save-to-s3! [credentials bucket k state-atom]
-  (ut/store-value-to-s3 credentials bucket k (pr-str @state-atom))
+  (ut/store-value-to-s3 credentials bucket k @state-atom)
   state-atom)
 
 (defrecord S3Backend [credentials bucket k committer]
