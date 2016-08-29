@@ -104,12 +104,11 @@
       :input-stream
       read-edn!))
 
-(defn store-value-to-s3 [creds bucket key value]
-  (let [str-val (pr-str value)
-        str-val-bytes (.getBytes str-val)]
+(defn store-value-to-s3 [creds bucket key ^String value]
+  (let [str-val-bytes (.getBytes value)]
     (aws/put-object creds bucket key
                     (jio/input-stream str-val-bytes)
-                    {:content-length (.length str-val)})))
+                    {:content-length (.length value)})))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
