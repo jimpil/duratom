@@ -3,6 +3,12 @@
   <img src="https://pbs.twimg.com/profile_images/681519713005006848/HgkHYOWb_400x400.png"/>
 </p>
 
+## Where
+
+[![Clojars Project](https://img.shields.io/clojars/v/duratom.svg)](https://clojars.org/duratom)
+
+## What
+
 A durable atom type for Clojure. Duratom implements the same interfaces as the core Clojure atom (IAtom, IRef, IDeref).
 In order to provide durability `duratom` will persist its state to some durable-backend on each mutation. The built-in backends are:
  
@@ -54,8 +60,7 @@ If you prefer passing arguments positionally, you can use the `file-atom`, `post
 ## Requirements
 
 ###Mandatory
-Java >= 1.7
-Clojure >= 1.7
+Java/Clojure >= 1.7
 
 ###Optional
 [clojure.java.jdbc](https://github.com/clojure/java.jdbc) >= 0.6.0  
