@@ -70,5 +70,5 @@
     )
   )
 
-(deftest demo-test
+#_(deftest demo-test
   (demo 10 [1 999999]))

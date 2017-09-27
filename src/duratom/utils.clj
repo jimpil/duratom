@@ -26,21 +26,9 @@
 
 (defn write-edn!
   "Efficiently write large data structures to a stream."
-  [data filepath]
+  [filepath data]
   (with-open [w (jio/writer filepath)]
     (.write ^BufferedWriter w (pr-str data))))
-
-(defn read-edn-from-bytes!
-  ""
-  [read-from-in! source] ;; e.g `nippy/thaw-from-in!`
-  (with-open [r (io/input-stream source)]
-    (read-from-in! (DataInputStream. r))))
-
-(defn write-edn-as-bytes!
-  ""
-  [write-to-out! edn-data target] ;; e.g `nippy/freeze-to-out!`
-  (with-open [w (io/output-stream target)]
-    (write-to-out! (DataOutputStream. w) edn-data)))
 
 (def move-opts
   (into-array [StandardCopyOption/ATOMIC_MOVE

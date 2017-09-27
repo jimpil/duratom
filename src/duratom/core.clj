@@ -2,10 +2,11 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [taoensso.nippy :as nippy])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom)
            (java.util.concurrent.locks ReentrantLock Lock)
-           (java.io IOException Writer)))
+           (java.io IOException Writer DataInputStream)))
 
 (defmacro ^:private maybe-lock
   "If your backend is a DB - that has its own lock"
@@ -125,9 +126,9 @@
 
 (def ^:private default-file-rw
   {:read ut/read-edn!
-   ;; for nippy use (partial ut/read-edn-from-bytes! nippy/thaw-from-in!)
+   ;; for nippy use `nippy/thaw-from-file`
    :write ut/write-edn!
-   ;; for nippy use (partial ut/ write-edn-as-bytes! nippy/freeze-to-out!)
+   ;; for nippy use `nippy/freeze-to-file`
    })
 
 (defn file-atom
@@ -187,7 +188,10 @@
 
 (def ^:private default-s3-rw
   {:read ut/read-edn!
-   :write pr-str})
+   ;; for nippy use `#(with-open [di (DataInputStream. %)] (nippy/thaw-from-in! di))`
+   :write pr-str
+   ;; for nippy use `nippy/freeze
+   })
 
 (defn s3-atom
   "Creates and returns an S3-backed atom. If the location denoted by the combination of <bucket> and <k> exists,

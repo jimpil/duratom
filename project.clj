@@ -6,7 +6,8 @@
   :dependencies [[org.clojure/clojure "1.8.0"]]
   :profiles {:dev {:dependencies [[org.clojure/java.jdbc "0.6.1"]
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
-                                  [amazonica "0.3.58"]]}}
+                                  [amazonica "0.3.58"]
+                                  [com.taoensso/nippy "2.13.0"]]}}
   ;:aot :all
   :lein-release {:deploy-via :clojars}
 

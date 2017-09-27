@@ -11,7 +11,7 @@
 (defn- save-to-file!
   [write-it! path state-atom]
   (let [tmp-file-name (str path ".tmp")]
-    (write-it! @state-atom tmp-file-name)     ;; write data to a temp file
+    (write-it! tmp-file-name @state-atom)     ;; write data to a temp file
     (ut/move-file! tmp-file-name path)        ;; and move it atomically
     state-atom))
 
