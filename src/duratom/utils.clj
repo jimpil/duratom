@@ -18,13 +18,13 @@
   (catch Exception e
     (require '[duratom.not-found.s3 :as aws])))
 
-(defn read-edn!
+(defn read-edn-from-file!
   "Efficiently read large data structures from a stream."
   [source]
   (with-open [r (PushbackReader. (jio/reader source))]
     (edn/read r)))
 
-(defn write-edn!
+(defn write-edn-to-file!
   "Efficiently write large data structures to a stream."
   [filepath data]
   (with-open [w (jio/writer filepath)]

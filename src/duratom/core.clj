@@ -125,9 +125,9 @@
 
 
 (def ^:private default-file-rw
-  {:read ut/read-edn!
+  {:read  ut/read-edn-from-file!
    ;; for nippy use `nippy/thaw-from-file`
-   :write ut/write-edn!
+   :write ut/write-edn-to-file!
    ;; for nippy use `nippy/freeze-to-file`
    })
 
@@ -187,7 +187,7 @@
                   })))
 
 (def ^:private default-s3-rw
-  {:read ut/read-edn!
+  {:read  ut/read-edn-from-file!
    ;; for nippy use `#(with-open [di (DataInputStream. %)] (nippy/thaw-from-in! di))`
    :write pr-str
    ;; for nippy use `nippy/freeze
