@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [duratom.core :refer :all]
             [clojure.java.io :as jio]
-            [duratom.utils :as ut]))
+            [duratom.utils :as ut]
+            [clojure.edn :as edn]))
 
 (defn- common* [dura peek-in-source exists?]
   (-> dura
@@ -25,7 +26,7 @@
   (Thread/sleep 200)
   (is (= [2 3] @dura))
   (is (thrown? AssertionError (swap! dura conj 4)))
-  (is (false? (exists?)) "Storage resurce was NOT deleted!!!")
+  (is (false? (exists?)) "Storage resource was NOT deleted!!!")
   )
 
 (deftest file-backed-tests
@@ -76,7 +77,9 @@
                       (println "Transitioning from" old-state "to" new-state "...")))]
 
     ;; empty row first
-    (common* dura #(ut/get-pgsql-value db-spec table-name 0) #(some? (ut/get-pgsql-value db-spec table-name 0)))
+    (common* dura
+             #(ut/get-pgsql-value db-spec table-name 0 edn/read-string)
+             #(some? (ut/get-pgsql-value db-spec table-name 0 edn/read-string)))
     ;; with-contents threafter
     (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
     (common* (add-watch
@@ -87,8 +90,8 @@
                         :init init)
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))
-             #(ut/get-pgsql-value db-spec table-name 0)
-             #(some? (ut/get-pgsql-value db-spec table-name 0)))
+             #(ut/get-pgsql-value db-spec table-name 0 edn/read-string)
+             #(some? (ut/get-pgsql-value db-spec table-name 0 edn/read-string)))
     )
   )
 

@@ -1,5 +1,6 @@
 (ns duratom.scoped-counter-example
-  (:require [duratom.core :as core]))
+  (:require [duratom.core :as core]
+            [clojure.test :refer :all]))
 
 
 ;; Requirement:
@@ -68,3 +69,6 @@
 
     )
   )
+
+(deftest demo-test
+  (demo 10 [1 999999]))

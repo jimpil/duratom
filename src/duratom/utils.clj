@@ -1,7 +1,8 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
-            [clojure.edn :as edn])
-  (:import (java.io PushbackReader BufferedWriter)
+            [clojure.edn :as edn]
+            [clojure.java.io :as io])
+  (:import (java.io PushbackReader BufferedWriter DataOutputStream DataInputStream)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
@@ -27,8 +28,19 @@
   "Efficiently write large data structures to a stream."
   [data filepath]
   (with-open [w (jio/writer filepath)]
-    (.write ^BufferedWriter w
-            (pr-str data))))
+    (.write ^BufferedWriter w (pr-str data))))
+
+(defn read-edn-from-bytes!
+  ""
+  [read-from-in! source] ;; e.g `nippy/thaw-from-in!`
+  (with-open [r (io/input-stream source)]
+    (read-from-in! (DataInputStream. r))))
+
+(defn write-edn-as-bytes!
+  ""
+  [write-to-out! edn-data target] ;; e.g `nippy/freeze-to-out!`
+  (with-open [w (io/output-stream target)]
+    (write-to-out! (DataOutputStream. w) edn-data)))
 
 (def move-opts
   (into-array [StandardCopyOption/ATOMIC_MOVE
@@ -78,15 +90,16 @@
     (sql/db-do-commands config (format "DELETE FROM %s WHERE id = %s" table-name row-id))
     (catch BatchUpdateException _ '(0)))) ;; table doesn't exist!
 
-(defn create-dedicated-table! [db-config table-name]
+(defn create-dedicated-table! [db-config table-name col-type]
+  (assert (some? col-type) "<col-type> is required!")
   (try
     (sql/db-do-commands db-config (sql/create-table-ddl table-name
-                                                        [[:id :int] [:value :text]]))
+                                                        [[:id :int] [:value col-type]]))
     (catch BatchUpdateException _ '(0)))) ;; table already exists!
 
-(defn get-pgsql-value [db table-name row-id]
+(defn get-pgsql-value [db table-name row-id read-it!]
   (sql/query db [(str "SELECT value FROM " table-name " WHERE id = " row-id " LIMIT 1")]
-             {:row-fn (comp edn/read-string :value)
+             {:row-fn (comp read-it! :value)
               :result-set-fn first}))
 
 (defn table-exists? [db table-name]
@@ -99,19 +112,20 @@
 (defn create-s3-bucket [creds bucket-name]
   (aws/create-bucket creds bucket-name))
 
-(defn get-value-from-s3 [creds bucket-name key]
+(defn get-value-from-s3 [creds bucket-name key read-it!]
   (-> (aws/get-object creds bucket-name key)
       :input-stream
-      read-edn!))
+      read-it!))
 
-(defn store-value-to-s3 [creds bucket key ^String value]
-  (let [str-val-bytes (.getBytes value)]
+(defn store-value-to-s3 [creds bucket key value]
+  (let [val-bytes (cond-> value
+                          (string? value) .getBytes)]
     (aws/put-object creds bucket key
-                    (jio/input-stream str-val-bytes)
-                    {:content-length (.length value)})))
+                    (jio/input-stream val-bytes)
+                    {:content-length (alength ^bytes val-bytes)})))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
 
-(defn does-bucket-exist [creds bucket-name]
+(defn bucket-exists? [creds bucket-name]
   (aws/does-bucket-exist creds bucket-name))

@@ -1,7 +1,8 @@
 (ns duratom.core
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
-            [clojure.java.io :as jio])
+            [clojure.java.io :as jio]
+            [clojure.edn :as edn])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io IOException Writer)))
@@ -122,12 +123,21 @@
     (release true)))
 
 
+(def ^:private default-file-rw
+  {:read ut/read-edn!
+   ;; for nippy use (partial ut/read-edn-from-bytes! nippy/thaw-from-in!)
+   :write ut/write-edn!
+   ;; for nippy use (partial ut/ write-edn-as-bytes! nippy/freeze-to-out!)
+   })
+
 (defn file-atom
   "Creates and returns a file-backed atom (on the local filesystem). If the file exists,
    it is read and becomes the initial value. Otherwise, the initial value is <init> and the file <file-path> is updated."
   ([file-path]
    (file-atom file-path (ReentrantLock.) nil))
   ([file-path lock initial-value]
+   (file-atom file-path lock initial-value default-file-rw))
+  ([file-path lock initial-value rw] ;;read-write details
    (map->Duratom {:lock lock ;; allow for explicit nil
                   :init initial-value
                   :make-backend (partial storage/->FileBackend
@@ -137,10 +147,20 @@
                                     (catch IOException exception
                                       (throw (ex-info "Error creating the required file on the file-system!"
                                                       {:file-path file-path}
-                                                      exception)))))
+                                                      exception))))
+                                         (:read rw)
+                                         (:write rw))
                   })))
 
 
+(def ^:private default-postgres-rw
+  {:read edn/read-string
+   ;; for nippy use `nippy/thaw`
+   :write pr-str
+   ;; for nippy use `nippy/freeze`
+   :column-type :text
+   ;; for nippy use :bytea
+   })
 
 (defn postgres-atom
   "Creates and returns a PostgreSQL-backed atom. If the location denoted by the combination of <db-config> and <table-name> exists,
@@ -150,16 +170,24 @@
   ([db-config table-name row-id]
    (postgres-atom db-config table-name row-id (ReentrantLock.) nil))
   ([db-config table-name row-id lock initial-value]
+   (postgres-atom db-config table-name row-id lock initial-value default-postgres-rw))
+  ([db-config table-name row-id lock initial-value rw]
    (map->Duratom {:lock lock
                   :init initial-value
                   :make-backend (partial storage/->PGSQLBackend
                                          db-config
                                          (if (ut/table-exists? db-config table-name)
                                            table-name
-                                           (do (ut/create-dedicated-table! db-config table-name)
+                                           (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
                                                table-name))
-                                         row-id)
+                                         row-id
+                                         (:read rw)
+                                         (:write rw))
                   })))
+
+(def ^:private default-s3-rw
+  {:read ut/read-edn!
+   :write pr-str})
 
 (defn s3-atom
   "Creates and returns an S3-backed atom. If the location denoted by the combination of <bucket> and <k> exists,
@@ -167,15 +195,19 @@
   ([creds bucket k]
    (s3-atom creds bucket k (ReentrantLock.) nil))
   ([creds bucket k lock initial-value]
-   (map->Duratom {:lock lock
-                  :init initial-value
+   (s3-atom creds bucket k lock initial-value default-s3-rw))
+  ([creds bucket k lock initial-value rw]
+   (map->Duratom {:lock         lock
+                  :init         initial-value
                   :make-backend (partial storage/->S3Backend
                                          creds
-                                         (if (ut/does-bucket-exist creds bucket)
+                                         (if (ut/bucket-exists? creds bucket)
                                            bucket
                                            (do (ut/create-s3-bucket creds bucket)
                                                bucket))
-                                         k)
+                                         k
+                                         (:read rw)
+                                         (:write rw))
                   })))
 
 
@@ -186,18 +218,21 @@
     backed-by))
 
 (defmethod duratom :local-file
-  [_ & {:keys [file-path init lock]
-        :or {lock (ReentrantLock.)}}]
-  (file-atom file-path lock init))
+  [_ & {:keys [file-path init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-file-rw}}]
+  (file-atom file-path lock init rw))
 
 (defmethod duratom :postgres-db
-  [_ & {:keys [db-config table-name row-id init lock]
-        :or {lock (ReentrantLock.)}}]
-  (postgres-atom db-config table-name row-id lock init))
+  [_ & {:keys [db-config table-name row-id init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-postgres-rw}}]
+  (postgres-atom db-config table-name row-id lock init rw))
 
 (defmethod duratom :aws-s3
-  [_ & {:keys [credentials bucket key init lock]
-        :or {lock (ReentrantLock.)}}]
-  (s3-atom credentials bucket key lock init))
+  [_ & {:keys [credentials bucket key init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-s3-rw}}]
+  (s3-atom credentials bucket key lock init rw))
 
 
