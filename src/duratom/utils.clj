@@ -1,8 +1,7 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io])
-  (:import (java.io PushbackReader BufferedWriter DataOutputStream DataInputStream)
+            [clojure.edn :as edn])
+  (:import (java.io PushbackReader BufferedWriter)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
