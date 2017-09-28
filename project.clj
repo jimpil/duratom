@@ -1,4 +1,4 @@
-(defproject duratom "0.3.4"
+(defproject duratom "0.3.5"
   :description "A durable atom type for Clojure."
   :url "https://github.com/jimpil/duratom"
   :license {:name "Eclipse Public License"
@@ -9,7 +9,7 @@
                                   [amazonica "0.3.58"]
                                   [com.taoensso/nippy "2.13.0"]]}}
   ;:aot :all
-  ;don't include any test/example files in the JAR
+  ;; don't include any test/example files in the JAR
   ;:jar-exclusions [#"(.+(test|example)(.(?i)clj)$)"]
   :lein-release {:deploy-via :clojars}
 

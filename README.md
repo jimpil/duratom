@@ -37,7 +37,7 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
 
 ;; backed by file
 (duratom :local-file
-         :file-path "/home/dimitris/Desktop/data.txt"
+         :file-path "/home/..."
          :init {:x 1 :y 2})
 
 ;; backed by postgres-db
@@ -57,6 +57,41 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
 
 The initial-value <init> is ignored, unless the underlying persistent storage is found to be empty.
 If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom` & `s3-atom` equivalents.
+
+## Custom :read & :write
+
+By default duratom stores plain EDN data (via `pr-str`). If that's good enough for your use too, you can skip this section. Otherwise, observe the following examples of utilising the `:rw` keyword for specifying [nippy](https://github.com/ptaoussanis/nippy) as the encoder/decoder of that EDN data:
+
+```clj
+;; nippy encoded bytes on the filesystem 
+(duratom :local-file
+         :file-path "/home/..."
+         :init {:x 1 :y 2}
+         :rw {:read nippy/thaw-from-file
+              :write nippy/freeze-to-file})
+
+;; nippy encoded bytes on PostgresDB
+(duratom :postgres-db
+         :db-config "any db-spec understood by clojure.java.jdbc"
+         :table-name "my_table"
+         :row-id 0
+         :init {:x 1 :y 2}
+         :rw {:read nippy/thaw
+              :write nippy/freeze
+              :column-type :bytea})
+          
+;;nippy encoded bytes on S3 
+(duratom :aws-s3
+         :credentials "as understood by amazonica"
+         :bucket "my_bucket"
+         :key "0"
+         :init {:x 1 :y 2}
+         :rw {:read #(with-open [dis (DataInputStream. %)]
+                       (nippy/thaw-from-in! dis))
+              :write nippy/freeze})          
+
+```
+
 
 ## Requirements
 
