@@ -2,11 +2,10 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
-            [clojure.edn :as edn]
-            [taoensso.nippy :as nippy])
+            [clojure.edn :as edn])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom)
            (java.util.concurrent.locks ReentrantLock Lock)
-           (java.io IOException Writer DataInputStream)))
+           (java.io IOException Writer)))
 
 (defmacro ^:private maybe-lock
   "If your backend is a DB - that has its own lock"
