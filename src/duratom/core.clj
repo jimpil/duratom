@@ -141,13 +141,8 @@
    (map->Duratom {:lock lock ;; allow for explicit nil
                   :init initial-value
                   :make-backend (partial storage/->FileBackend
-                                  (try
-                                    (doto (jio/file file-path)
-                                          (.createNewFile))
-                                    (catch IOException exception
-                                      (throw (ex-info "Error creating the required file on the file-system!"
-                                                      {:file-path file-path}
-                                                      exception))))
+                                         (doto (jio/file file-path)
+                                           (.createNewFile))
                                          (:read rw)
                                          (:write rw))
                   })))
@@ -187,7 +182,7 @@
 
 (def ^:private default-s3-rw
   {:read  ut/read-edn-from-file!
-   ;; for nippy use `#(with-open [di (DataInputStream. %)] (nippy/thaw-from-in! di))`
+   ;; for nippy use `#(with-open [dis (DataInputStream. %)] (nippy/thaw-from-in! dis))`
    :write pr-str
    ;; for nippy use `nippy/freeze
    })
