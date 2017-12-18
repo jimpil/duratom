@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module cursive.leiningen.project.LeiningenProjectsManager.displayName="duratom:0.3.5" cursive.leiningen.project.LeiningenProjectsManager.isLeinModule="true" version="4">
+<module cursive.leiningen.project.LeiningenProjectsManager.displayName="duratom:0.3.6" cursive.leiningen.project.LeiningenProjectsManager.isLeinModule="true" version="4">
   <component name="NewModuleRootManager">
     <output url="file://$MODULE_DIR$/target/classes" />
     <output-test url="file://$MODULE_DIR$/target/classes" />
@@ -97,8 +97,10 @@
     <orderEntry type="library" name="Leiningen: org.apache.httpcomponents/httpclient:4.3.6" level="project" />
     <orderEntry type="library" name="Leiningen: org.apache.httpcomponents/httpcore:4.3.3" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/algo.generic:0.1.2" level="project" />
-    <orderEntry type="library" name="Leiningen: org.clojure/clojure:1.8.0" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/clojure:1.9.0" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/core.specs.alpha:0.1.24" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/java.jdbc:0.6.1" level="project" />
+    <orderEntry type="library" name="Leiningen: org.clojure/spec.alpha:0.1.143" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/tools.nrepl:0.2.12" level="project" />
     <orderEntry type="library" name="Leiningen: org.clojure/tools.reader:0.10.0" level="project" />
     <orderEntry type="library" name="Leiningen: org.iq80.snappy/snappy:0.4" level="project" />

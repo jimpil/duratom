@@ -59,8 +59,10 @@
 (defmacro lock? [l]
   `(instance? Lock ~l))
 
-(defmacro assert-not-released! [release-fn]
-  `(assert (not (~release-fn)) "Duratom has been released!"))
+(defmacro assert-not-released!
+  [release-fn]
+  `(when (~release-fn)
+     (throw (IllegalStateException. "Duratom has been released!"))))
 
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!

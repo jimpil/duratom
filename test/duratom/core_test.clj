@@ -4,11 +4,12 @@
             [clojure.java.io :as jio]
             [duratom.utils :as ut]
             [clojure.edn :as edn]
-            [taoensso.nippy :as nippy]))
+            [taoensso.nippy :as nippy]
+            [clojure.java.io :as io]))
 
 (defn- common*
   [dura peek-in-source exists?]
-  (-> dura
+  (-> dura ;; init = {:x 1 :y 2}
       (doto (swap! assoc :z 3))
       (doto (swap! dissoc :x)))
 
@@ -24,16 +25,27 @@
   (is (= [2 3] @dura))
   (is (= [2 3] (peek-in-source)))
 
+  (Thread/sleep 200)
+  (is (= [[2 3] [1 2 3]]
+         (reset-vals! dura [1 2 3])))
+
+  (Thread/sleep 200)
+  (is (= [[1 2 3] [2 3]]
+         (swap-vals! dura rest)))
+
+  (Thread/sleep 200)
   (destroy dura)
   (Thread/sleep 200)
   (is (= [2 3] @dura))
-  (is (thrown? AssertionError (swap! dura conj 4)))
+  (is (thrown? IllegalStateException (swap! dura conj 4)))
   (is (false? (exists?)) "Storage resource was NOT deleted!!!")
   )
 
 (deftest file-backed-tests
   (println "File-backed atom...")
   (let [rel-path "data_temp.txt"
+        _ (when (.exists (jio/file rel-path))
+            (io/delete-file rel-path)) ;; proper cleanup before testing
         init {:x 1 :y 2}
         dura (add-watch
                (duratom :local-file
@@ -68,6 +80,7 @@
                  :username    "dimitris"
                  :password    "secret"}
         table-name "atom_state"
+        _ (ut/delete-relevant-row! db-spec table-name 0)
         init {:x 1 :y 2}
         dura (add-watch
                (duratom :postgres-db
@@ -101,6 +114,8 @@
 
   (testing "File-backed atom containing `nippy` bytes..."
     (let [rel-path "data_temp.txt"
+          _ (when (.exists (jio/file rel-path))
+              (io/delete-file rel-path)) ;; proper cleanup before testing
           init {:x 1 :y 2}
           dura (add-watch
                  (duratom :local-file

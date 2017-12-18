@@ -3,9 +3,9 @@
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
             [clojure.edn :as edn])
-  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom)
+  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
            (java.util.concurrent.locks ReentrantLock Lock)
-           (java.io IOException Writer)))
+           (java.io Writer)))
 
 (defmacro ^:private maybe-lock
   "If your backend is a DB - that has its own lock"
@@ -17,6 +17,38 @@
 
 (deftype Duratom
   [storage-backend ^Atom underlying-atom ^Lock lock release _meta]
+
+  IAtom2 ;; the new interface introduced in 1.9
+  (swapVals [_ f]
+    (ut/assert-not-released! release)
+    (maybe-lock lock
+      (let [result (.swapVals underlying-atom f)]
+        (storage/commit storage-backend)
+        result)))
+  (swapVals [_ f arg1]
+    (ut/assert-not-released! release)
+    (maybe-lock lock
+      (let [result (.swapVals underlying-atom f arg1)]
+        (storage/commit storage-backend)
+        result)))
+  (swapVals [_ f arg1 arg2]
+    (ut/assert-not-released! release)
+    (maybe-lock lock
+      (let [result (.swapVals underlying-atom f arg1 arg2)]
+        (storage/commit storage-backend)
+        result)))
+  (swapVals [_ f arg1 arg2 more]
+    (ut/assert-not-released! release)
+    (maybe-lock lock
+      (let [result (.swapVals underlying-atom f arg1 arg2 more)]
+        (storage/commit storage-backend)
+        result)))
+  (resetVals [_ newvals]
+    (ut/assert-not-released! release)
+    (maybe-lock lock
+      (let [result (.resetVals underlying-atom newvals)]
+        (storage/commit storage-backend)
+        result)))
 
   IAtom
   (swap [_ f]
@@ -37,10 +69,10 @@
       (let [result (.swap underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
-  (swap [_ f x y args]
+  (swap [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (maybe-lock lock
-      (let [result (.swap underlying-atom f x y args)]
+      (let [result (.swap underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (compareAndSet [_ oldv newv]
