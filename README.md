@@ -5,7 +5,7 @@
 
 ## Where
 
-[![Clojars Project](https://img.shields.io/clojars/v/duratom.svg)](https://clojars.org/duratom)
+[![Clojars Project](https://clojars.org/duratom/latest-version.svg)](https://clojars.org/duratom)
 
 ## What
 
