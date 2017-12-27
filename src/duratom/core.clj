@@ -7,12 +7,6 @@
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer)))
 
-(defmacro ^:private maybe-lock
-  "If your backend is a DB - that has its own lock"
-  [lock & body]
-  `(if-let [l# ~lock]
-     (ut/with-locking l# ~@body)
-     (do ~@body)))
 ;; ================================================================
 
 (deftype Duratom
@@ -21,31 +15,31 @@
   IAtom2 ;; the new interface introduced in 1.9
   (swapVals [_ f]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swapVals underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swapVals underlying-atom f arg1)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1 arg2]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swapVals underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swapVals underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (resetVals [_ newvals]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.resetVals underlying-atom newvals)]
         (storage/commit storage-backend)
         result)))
@@ -53,38 +47,38 @@
   IAtom
   (swap [_ f]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swap underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swap underlying-atom f arg)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swap underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.swap underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (compareAndSet [_ oldv newv]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.compareAndSet underlying-atom oldv newv)]
         (when result
           (storage/commit storage-backend))
         result)))
   (reset [_ newval]
     (ut/assert-not-released! release)
-    (maybe-lock lock
+    (ut/with-locking lock
       (let [result (.reset underlying-atom newval)]
         (storage/commit storage-backend)
         result)))
@@ -125,9 +119,8 @@
 
 (defn- ->Duratom
   [make-backend lock init]
-  (assert (or (ut/lock? lock)
-              (nil? lock))
-          "The <lock> provided is neither a valid implementation of `java.util.concurrent.locks.Lock`, nor nil!")
+  (assert (ut/lock? lock)
+          "The <lock> provided is NOT a valid implementation of `java.util.concurrent.locks.Lock`!")
   (let [raw-atom (atom nil)
         backend (make-backend (agent raw-atom))
         duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
