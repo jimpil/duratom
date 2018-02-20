@@ -1,0 +1,8 @@
+{:deps {}
+ :aliases
+ {:test {:extra-deps
+         {org.clojure/java.jdbc {:mvn/version "0.6.1"}}
+         {org.postgresql/postgresql {:mvn/version "9.4.1208.jre7"}}
+         {amazonica {:mvn/version "0.3.58"}}
+         {com.taoensso/nippy {:mvn/version "2.13.0"}}}}
+ }
