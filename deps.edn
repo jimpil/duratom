@@ -1,13 +1,12 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.9.0"}}
- :aliases
- {:test {:main-opts ["-m" "cognitect.test-runner"]
-         :extra-paths ["test"]
-         :extra-deps {com.cognitect/test-runner {:git/url "git@github.com:cognitect-labs/test-runner"
-                                                 :sha "5fb4fc46ad0bf2e0ce45eba5b9117a2e89166479"}
-                      org.clojure/java.jdbc {:mvn/version "0.6.1"}
-                      org.postgresql/postgresql {:mvn/version "9.4.1208.jre7"}
-                      com.taoensso/nippy {:mvn/version "2.13.0"}
-                      amazonica {:mvn/version "0.3.58"}}}
-  }
+ :aliases {:test {:main-opts ["-m" "cognitect.test-runner"]
+                  :extra-paths ["test"]
+                  :extra-deps {com.cognitect/test-runner {:git/url "git@github.com:cognitect-labs/test-runner"
+                                                          :sha "5fb4fc46ad0bf2e0ce45eba5b9117a2e89166479"}
+                               org.clojure/java.jdbc {:mvn/version "0.6.1"}
+                               org.postgresql/postgresql {:mvn/version "9.4.1208.jre7"}
+                               com.taoensso/nippy {:mvn/version "2.13.0"}
+                               amazonica {:mvn/version "0.3.58"}}}
+           }
  }
