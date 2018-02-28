@@ -3,7 +3,7 @@
  :aliases {:test {:main-opts ["-m" "cognitect.test-runner"]
                   :extra-paths ["test"]
                   :extra-deps {com.cognitect/test-runner {:git/url "git@github.com:cognitect-labs/test-runner"
-                                                          :sha "5fb4fc46ad0bf2e0ce45eba5b9117a2e89166479"}
+                                                          :sha "5f2b5c2efb444df76fb5252102b33f542ebf7f58"}
                                org.clojure/java.jdbc {:mvn/version "0.6.1"}
                                org.postgresql/postgresql {:mvn/version "9.4.1208.jre7"}
                                com.taoensso/nippy {:mvn/version "2.13.0"}
