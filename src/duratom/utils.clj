@@ -1,7 +1,6 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io])
+            [clojure.edn :as edn])
   (:import (java.io PushbackReader BufferedWriter InputStream ByteArrayOutputStream)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
@@ -29,9 +28,9 @@
   (^bytes [s3-in]
    (s3-bucket-bytes 1024 s3-in))
   (^bytes [buffer-size ^InputStream s3-in]
-   (with-open [in (io/input-stream s3-in)]
+   (with-open [in (jio/input-stream s3-in)]
      (let [out (ByteArrayOutputStream. (int buffer-size))]
-       (io/copy in out)
+       (jio/copy in out)
        (.toByteArray out)))))
 
 (defn read-edn-from-file!

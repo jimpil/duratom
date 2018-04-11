@@ -2,8 +2,7 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
-            [clojure.edn :as edn]
-            [clojure.java.io :as io])
+            [clojure.edn :as edn])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer)))
