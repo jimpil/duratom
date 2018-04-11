@@ -86,8 +86,8 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
          :bucket "my_bucket"
          :key "0"
          :init {:x 1 :y 2}
-         :rw {:read #(with-open [in (DataInputStream. %)
-                                 out (ByteArrayOutputStream. (.available in))]
+         :rw {:read #(with-open [in (io/input-stream %)
+                                 out (ByteArrayOutputStream. 1024)] ;; or some other buffer size
                        (io/copy in out)
                        (nippy/thaw (.toByteArray out)))
               :write nippy/freeze})          

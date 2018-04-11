@@ -2,7 +2,8 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [clojure.java.io :as io])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer)))
@@ -206,13 +207,13 @@
                   })))
 
 (def ^:private default-s3-rw
-  {:read  ut/read-edn-from-file!
+  {:read ut/read-edn-from-file!
    ;; for nippy use:
-  #_ #(with-open [in (DataInputStream. %)
-                out (ByteArrayOutputStream. (.available in))]
+  #_ #(with-open [in (io/input-stream %)
+                out (ByteArrayOutputStream. 1024)]
       (io/copy in out)
       (nippy/thaw (.toByteArray out)))
-   :write ut/pr-str-fully
+         :write ut/pr-str-fully
    ;; for nippy use `nippy/freeze
    })
 
