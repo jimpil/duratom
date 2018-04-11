@@ -150,10 +150,8 @@
 
 
 (def ^:private default-file-rw
-  {:read  ut/read-edn-from-file!
-   ;; for nippy use `nippy/thaw-from-file`
-   :write ut/write-edn-to-file!
-   ;; for nippy use `nippy/freeze-to-file`
+  {:read ut/read-edn-from-file! ;; for nippy use `nippy/thaw-from-file`
+   :write ut/write-edn-to-file! ;; for nippy use `nippy/freeze-to-file`
    })
 
 (defn file-atom
@@ -175,12 +173,9 @@
 
 
 (def ^:private default-postgres-rw
-  {:read        edn/read-string
-   ;; for nippy use `nippy/thaw`
-   :write       ut/pr-str-fully
-   ;; for nippy use `nippy/freeze`
-   :column-type :text
-   ;; for nippy use :bytea
+  {:read edn/read-string  ;; for nippy use `nippy/thaw`
+   :write ut/pr-str-fully ;; for nippy use `nippy/freeze`
+   :column-type :text     ;; for nippy use :bytea
    })
 
 (defn postgres-atom
@@ -207,14 +202,8 @@
                   })))
 
 (def ^:private default-s3-rw
-  {:read ut/read-edn-from-file!
-   ;; for nippy use:
-  #_ #(with-open [in (io/input-stream %)
-                out (ByteArrayOutputStream. 1024)]
-      (io/copy in out)
-      (nippy/thaw (.toByteArray out)))
-         :write ut/pr-str-fully
-   ;; for nippy use `nippy/freeze
+  {:read ut/read-edn-from-file! ;; for nippy use `(comp nippy/thaw ut/s3-bucket-bytes)`
+   :write ut/pr-str-fully       ;; for nippy use `nippy/freeze`
    })
 
 (defn s3-atom

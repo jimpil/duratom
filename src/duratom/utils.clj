@@ -1,7 +1,8 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
-            [clojure.edn :as edn])
-  (:import (java.io PushbackReader BufferedWriter)
+            [clojure.edn :as edn]
+            [clojure.java.io :as io])
+  (:import (java.io PushbackReader BufferedWriter InputStream ByteArrayOutputStream)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
@@ -23,6 +24,16 @@
   (binding [*print-length* nil]
     (apply pr-str xs)))
 
+(defn s3-bucket-bytes
+  "A helper for pulling out the bytes out of an S3 bucket."
+  (^bytes [s3-in]
+   (s3-bucket-bytes 1024 s3-in))
+  (^bytes [buffer-size ^InputStream s3-in]
+   (with-open [in (io/input-stream s3-in)]
+     (let [out (ByteArrayOutputStream. (int buffer-size))]
+       (io/copy in out)
+       (.toByteArray out)))))
+
 (defn read-edn-from-file!
   "Efficiently read large data structures from a stream."
   [source]
@@ -32,8 +43,8 @@
 (defn write-edn-to-file!
   "Efficiently write large data structures to a stream."
   [filepath data]
-  (with-open [w (jio/writer filepath)]
-    (.write ^BufferedWriter w (pr-str-fully data))))
+  (with-open [^BufferedWriter w (jio/writer filepath)]
+    (.write w (pr-str-fully data))))
 
 (def move-opts
   (into-array [StandardCopyOption/ATOMIC_MOVE
@@ -113,11 +124,12 @@
       read-it!))
 
 (defn store-value-to-s3 [creds bucket key value]
-  (let [val-bytes (cond-> value
-                          (string? value) .getBytes)]
+  (let [^bytes val-bytes (if (string? value)
+                           (.getBytes ^String value)
+                           value)]
     (aws/put-object creds bucket key
                     (jio/input-stream val-bytes)
-                    {:content-length (alength ^bytes val-bytes)})))
+                    {:content-length (alength val-bytes)})))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
