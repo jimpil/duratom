@@ -128,7 +128,7 @@
                            value)]
     (aws/put-object creds bucket key
                     (jio/input-stream val-bytes)
-                    {:content-length (alength val-bytes)})))
+                    {:metadata {:content-length (alength val-bytes)}})))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
