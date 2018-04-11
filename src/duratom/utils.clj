@@ -17,6 +17,12 @@
   (catch Exception e
     (require '[duratom.not-found.s3 :as aws])))
 
+(defn pr-str-fully
+  "Wrapper around `pr-str` which binds *print-length* to nil."
+  ^String [& xs]
+  (binding [*print-length* nil]
+    (apply pr-str xs)))
+
 (defn read-edn-from-file!
   "Efficiently read large data structures from a stream."
   [source]
@@ -27,7 +33,7 @@
   "Efficiently write large data structures to a stream."
   [filepath data]
   (with-open [w (jio/writer filepath)]
-    (.write ^BufferedWriter w (pr-str data))))
+    (.write ^BufferedWriter w (pr-str-fully data))))
 
 (def move-opts
   (into-array [StandardCopyOption/ATOMIC_MOVE

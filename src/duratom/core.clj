@@ -174,9 +174,9 @@
 
 
 (def ^:private default-postgres-rw
-  {:read edn/read-string
+  {:read        edn/read-string
    ;; for nippy use `nippy/thaw`
-   :write pr-str
+   :write       ut/pr-str-fully
    ;; for nippy use `nippy/freeze`
    :column-type :text
    ;; for nippy use :bytea
@@ -207,8 +207,12 @@
 
 (def ^:private default-s3-rw
   {:read  ut/read-edn-from-file!
-   ;; for nippy use `#(with-open [dis (DataInputStream. %)] (nippy/thaw-from-in! dis))`
-   :write pr-str
+   ;; for nippy use:
+  #_ #(with-open [in (DataInputStream. %)
+                out (ByteArrayOutputStream. (.available in))]
+      (io/copy in out)
+      (nippy/thaw (.toByteArray out)))
+   :write ut/pr-str-fully
    ;; for nippy use `nippy/freeze
    })
 
