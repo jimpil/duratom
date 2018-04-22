@@ -8,9 +8,8 @@
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
                                   [amazonica "0.3.58"]
                                   [com.taoensso/nippy "2.13.0"]]}}
-  ;:aot :all
-  ;; don't include any test/example files in the JAR
-  ;:jar-exclusions [#"(.+(test|example)(.(?i)clj)$)"]
+  :source-paths ["src/clojure"]
+  :java-source-paths ["src/java"]
   :lein-release {:deploy-via :clojars}
 
   )

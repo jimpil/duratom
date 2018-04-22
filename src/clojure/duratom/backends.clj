@@ -55,10 +55,10 @@
   (ut/store-value-to-s3 credentials bucket k (write-it! @state-atom))
   state-atom)
 
-(defrecord S3Backend [credentials bucket k read-it! write-it! committer]
+(defrecord S3Backend [credentials bucket k metadata read-it! write-it! committer]
   IStorageBackend
   (snapshot [_]
-    (ut/get-value-from-s3 credentials bucket k read-it!))
+    (ut/get-value-from-s3 credentials bucket k metadata read-it!))
   (commit [_]
     (send-off committer (partial save-to-s3! credentials bucket k write-it!)))
   (cleanup [_]

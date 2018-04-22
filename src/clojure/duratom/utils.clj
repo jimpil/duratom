@@ -1,11 +1,13 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
             [clojure.edn :as edn])
-  (:import (java.io PushbackReader BufferedWriter InputStream ByteArrayOutputStream)
+  (:import (java.io PushbackReader BufferedWriter)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
-           (java.sql BatchUpdateException)))
+           (java.sql BatchUpdateException)
+           (dbaos DirectByteArrayOutputStream)
+           (java.security MessageDigest)))
 
 (try
   (require '[clojure.java.jdbc :as sql])
@@ -24,26 +26,41 @@
     (apply pr-str xs)))
 
 (defn s3-bucket-bytes
-  "A helper for pulling out the bytes out of an S3 bucket."
+  "A helper for pulling out the bytes out of an S3 bucket,
+   which has the potential for zero copying."
   (^bytes [s3-in]
-   (s3-bucket-bytes 1024 s3-in))
-  (^bytes [buffer-size ^InputStream s3-in]
+   (s3-bucket-bytes 4096 s3-in))
+  (^bytes [buffer-size s3-in]
    (with-open [in (jio/input-stream s3-in)]
-     (let [out (ByteArrayOutputStream. (int buffer-size))]
-       (jio/copy in out)
+     (let [bs (int buffer-size)
+           out (DirectByteArrayOutputStream. bs)] ;; allows for copy-less streaming when size is known
+       (jio/copy in out :buffer-size bs) ;; minimize number of loops required to fill the `out` buffer
        (.toByteArray out)))))
 
-(defn read-edn-from-file!
-  "Efficiently read large data structures from a stream."
-  [source]
-  (with-open [r (PushbackReader. (jio/reader source))]
-    (edn/read r)))
+(defn read-edn-object
+  "Efficiently read one data structure from a stream.
+   Both arities do the same thing."
+  ([source]
+   (read-edn-object nil source))
+  ([_buffer source]
+   (with-open [r (PushbackReader. (jio/reader source))]
+     (edn/read r))))
 
-(defn write-edn-to-file!
+(defn write-edn-object
   "Efficiently write large data structures to a stream."
   [filepath data]
   (with-open [^BufferedWriter w (jio/writer filepath)]
     (.write w (pr-str-fully data))))
+
+(defn read-edn-objects
+  "Efficiently multiple data structures from a stream."
+  [source]
+  (let [eof (Object.)]
+    (with-open [rdr (PushbackReader. (jio/reader source))]
+      (->> (partial edn/read {:eof eof} rdr)
+           repeatedly
+           (take-while (partial not= eof))
+           doall))))
 
 (def move-opts
   (into-array [StandardCopyOption/ATOMIC_MOVE
@@ -80,6 +97,13 @@
   `(when (~release-fn)
      (throw (IllegalStateException. "Duratom has been released!"))))
 
+(defn- md5sum
+  "Calculates the MD5 checksum for given bytes <xs>."
+  ^String [^bytes xs]
+  (let [hsh (-> (MessageDigest/getInstance "MD5")
+                (.digest xs))]
+    (format "%032x" (BigInteger. 1 hsh)))) ;; md5 is fixed size (32)
+
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!
   "Updates columns or inserts a new row in the specified table."
@@ -110,25 +134,34 @@
 (defn table-exists? [db table-name]
   (sql/query db ["SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"]
              {:row-fn :table_name
-              :result-set-fn #(some? (some #{table-name} %))}))
+              :result-set-fn (comp some? (partial some #{table-name}))}))
 
 ;; S3 utils
 
 (defn create-s3-bucket [creds bucket-name]
   (aws/create-bucket creds bucket-name))
 
-(defn get-value-from-s3 [creds bucket-name key read-it!]
-  (-> (aws/get-object creds bucket-name key)
-      :input-stream
-      read-it!))
+(defn get-value-from-s3 [creds bucket-name k metadata read-it!]
+  (let [obj-size (when-not (-> read-it! meta :ignore-size?)
+                   ;; make sure the reader needs the object-size, otherwise don't bother
+                   (:content-length (aws/get-object-metadata creds bucket-name k)))]
+    (->> (aws/get-object creds
+                         :bucket bucket-name
+                         :key k
+                         :metadata metadata)
+         :input-stream
+         (read-it! obj-size))))
 
-(defn store-value-to-s3 [creds bucket key value]
+(defn store-value-to-s3 [creds bucket k value]
   (let [^bytes val-bytes (if (string? value)
                            (.getBytes ^String value)
                            value)]
-    (aws/put-object creds bucket key
-                    (jio/input-stream val-bytes)
-                    {:metadata {:content-length (alength val-bytes)}})))
+    (aws/put-object creds
+      :bucket-name bucket
+      :key k
+      :input-stream (jio/input-stream val-bytes)
+      :metadata {:content-length (alength val-bytes)
+                 :content-md5 (md5sum val-bytes)})))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
