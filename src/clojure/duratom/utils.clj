@@ -41,17 +41,21 @@
        (.toByteArray out)))))
 
 (defn read-edn-object
-  "Efficiently read one data structure from a stream.
-   Both arities do the same thing."
+  "Efficiently read one data structure from a stream."
   ([source]
    (read-edn-object readers/default source))
-  ([opts-or-buffer source]
+  ([opts source]
+   (read-edn-object opts nil source))
+  ([opts _ source] ;; need this arity
    (with-open [r (PushbackReader. (jio/reader source))]
-     (edn/read
-       (if (map? opts-or-buffer)
-         opts-or-buffer
-         {})
-       r))))
+     (edn/read opts r))))
+
+(defn read-edn-string
+  "Efficiently read one data structure from a stream."
+  ([s]
+   (read-edn-string readers/default s))
+  ([opts s]
+   (edn/read-string opts s)))
 
 (defn write-edn-object
   "Efficiently write large data structures to a stream."
