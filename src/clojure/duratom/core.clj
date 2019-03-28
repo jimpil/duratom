@@ -2,7 +2,8 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [duratom.readers :as readers])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer)))
@@ -172,7 +173,7 @@
 
 
 (def default-postgres-rw
-  {:read edn/read-string  ;; for nippy use `nippy/thaw`
+  {:read (partial edn/read-string readers/default)  ;; for nippy use `nippy/thaw`
    :write ut/pr-str-fully ;; for nippy use `nippy/freeze`
    :column-type :text     ;; for nippy use :bytea
    })

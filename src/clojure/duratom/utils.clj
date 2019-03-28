@@ -1,13 +1,16 @@
 (ns duratom.utils
   (:require [clojure.java.io :as jio]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [duratom.readers :as readers])
   (:import (java.io PushbackReader BufferedWriter)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
            (java.sql BatchUpdateException)
            (dbaos DirectByteArrayOutputStream)
-           (java.security MessageDigest)))
+           (java.security MessageDigest)
+           (java.util Base64)
+           (duratom.readers ObjectWithMeta)))
 
 (try
   (require '[clojure.java.jdbc :as sql])
@@ -41,10 +44,14 @@
   "Efficiently read one data structure from a stream.
    Both arities do the same thing."
   ([source]
-   (read-edn-object nil source))
-  ([_buffer source]
+   (read-edn-object readers/default source))
+  ([opts-or-buffer source]
    (with-open [r (PushbackReader. (jio/reader source))]
-     (edn/read r))))
+     (edn/read
+       (if (map? opts-or-buffer)
+         opts-or-buffer
+         {})
+       r))))
 
 (defn write-edn-object
   "Efficiently write large data structures to a stream."
@@ -52,12 +59,13 @@
   (with-open [^BufferedWriter w (jio/writer filepath)]
     (.write w (pr-str-fully data))))
 
-(defn read-edn-objects
+(defn read-edn-objects ;; not used anywhere - remove???
   "Efficiently multiple data structures from a stream."
-  [source]
+  [opts source]
   (let [eof (Object.)]
     (with-open [rdr (PushbackReader. (jio/reader source))]
-      (->> (partial edn/read {:eof eof} rdr)
+      (->> rdr
+           (partial edn/read (merge readers/default opts {:eof eof}))
            repeatedly
            (take-while (partial not= eof))
            doall))))
@@ -98,11 +106,21 @@
      (throw (IllegalStateException. "Duratom has been released!"))))
 
 (defn- md5sum
-  "Calculates the MD5 checksum for given bytes <xs>."
+  "Calculates the MD5 checksum for given bytes <xs>,
+  and returns it in base64."
   ^String [^bytes xs]
   (let [hsh (-> (MessageDigest/getInstance "MD5")
                 (.digest xs))]
-    (format "%032x" (BigInteger. 1 hsh)))) ;; md5 is fixed size (32)
+    (.encodeToString (Base64/getEncoder) hsh)))
+
+(defn iobj->edn-tag
+  "Helper fn for constructing ObjectWithMeta wrapper.
+   An object of this type will essentially be serialised
+   as a vector of two elements - the <coll> and its metadata map.
+   It will be read back as <coll> with the right metadata attached."
+  [coll]
+  (assert (some? (meta coll)) "No meta found!")
+  (ObjectWithMeta. coll))
 
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!

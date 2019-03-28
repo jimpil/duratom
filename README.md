@@ -91,10 +91,18 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
 
 ```
 
+## Preserving types
+As of version `0.4.2`, `duratom` makes an effort (by default) to support certain (important from an `atom` perspective) collections, that are not part of the EDN spec. These are the two sorted collections (map/set), and the somewhat hidden, but otherwise very useful `clojure.lang.PesistentQueue.java`. Therefore, for these particular collections you can expect correct round-tripping (printing/reading), without losing the actual type along the way. It does this, by outputting custom tags (i.e. `#sorted/map`, `#sorted/set` \& `#queue`), and then reading back those tags with custom `:readers` (via `clojure.edn/read`). More details can be seen in the `duratom.readers.clj` namespace. 
+
+## Metadata
+Metadata, as conveyed and understood by Clojure, are not part of the EDN spec. Therefore one cannot expect them to be preserved during EDN (de)-serialisation. However, the metadata itself is just another map, and therefore this is not really an issue. If you want this to happen somewhat 'auto-magically', `duratom` includes an object (constructed via `utils/iobj->edn-tag`) which can be used to wrap your collection before passing it for printing. This object is nothing special - in fact it does absolutely nothing! It's a placeholder object which `duratom` prints unpacked into a vector tuple with a special tag `#iobj` - and reads it back with a custom reader which simply packs it back. It does sound rather convenient, and it will work (see `readers_test.clj`), however I would still not recommend actually doing that. It feels way too magical and somewhat indirect. It is completely trivial to do this process manually before `duratom` ever sees your data. Simply unpack the collection into a vector of two elements (the coll and its metadata-map), and pass that to `duratom`. Then at the other end, turning that vector into a collection with some metadata is just a matter of calling `with-meta`. Despite practically equivalent from a runtime POV, the latter approach will look much more evident (from a source-code POV). 
+
+
 
 ## Requirements
 
-Java/Clojure >= 1.7
+Java >= 8
+Clojure >= 1.9
 
 ### Optional Requirements
 
