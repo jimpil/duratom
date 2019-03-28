@@ -37,16 +37,12 @@
 
 (defmethod print-method ObjectWithMeta
   [o ^Writer w]
-  (.write w "#iobj ")
   (let [coll (:o o)]
+    (.write w "#iobj ")
     (print-method [coll (meta coll)] w)))
 
-(defn- tuple->iobj
-  [[o meta-map]]
-  (with-meta o meta-map))
-
 (def meta-reader
-  {'iobj tuple->iobj})
+  {'iobj (partial apply with-meta)})
 
 (defmethod print-method PersistentQueue
   [o ^Writer w]
