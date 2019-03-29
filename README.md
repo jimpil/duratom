@@ -99,12 +99,9 @@ This can be viewed as a breaking change, albeit one that probably won't break an
 ## Metadata
 Similarly to the aforementioned important types, as of version `0.4.2`, `duratom` also makes an effort (by default) to preserve metadata. It does this by wrapping the collection provided in a special type (constructed via `utils/iobj->edn-tag`), and prints that instead, emitting a special tag `#duratom/iobj`. Then at the other end (reading), a custom reader is provided specifically for this tag. 
 
-If you are content with losing metadata and want to revert to the previous default behaviour, you can do so by overriding the default writer (given your backend). For example the local file-backed `duratom` now uses `ut/write-edn-object` as the default writer. Using `(partial ut/write-edn-object false)` as your writer, will completely sidestep the newly added metadata support (the `#duratom/iobj` tag will never be emitted).
-
-
 Even though this sounds like a major breaking-change, it actually isn't! Similar to the sorted-map example earlier, if you've previously serialised a map (with metadata) with `duratom`, you've lost that metadata. Reading it back with 0.4.2, will result in a  map without metadata, the same as with any other version (the metadata is lost forever). If you then `swap!` with a fn which adds metadata, then that will be custom-printed (with the new custom tag), and read just fine later. 
 
-
+If you are content with losing metadata and want to revert to the previous default behaviour, you can do so by overriding the default writer (given your backend). For example the local file-backed `duratom` now uses `ut/write-edn-object` as the default writer. Using `(partial ut/write-edn-object false)` as your writer, will completely sidestep the newly added metadata support (the `#duratom/iobj` tag will never be emitted).
 
 ## Requirements
 
