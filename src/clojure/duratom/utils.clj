@@ -22,11 +22,23 @@
   (catch Exception e
     (require '[duratom.not-found.s3 :as aws])))
 
+(defn iobj->edn-tag
+  "Helper fn for constructing ObjectWithMeta wrapper.
+   An object of this type will essentially be serialised
+   as a vector of two elements - the <coll> and its metadata map.
+   It will be read back as <coll> with the right metadata attached."
+  [coll]
+  (if (some? (meta coll))
+    (ObjectWithMeta. coll)
+    coll))
+
 (defn pr-str-fully
   "Wrapper around `pr-str` which binds *print-length* to nil."
-  ^String [& xs]
+  ^String [unpack-meta? & xs]
   (binding [*print-length* nil]
-    (apply pr-str xs)))
+    (cond->> xs
+             unpack-meta? (map iobj->edn-tag)
+             true (apply pr-str))))
 
 (defn s3-bucket-bytes
   "A helper for pulling out the bytes out of an S3 bucket,
@@ -59,9 +71,13 @@
 
 (defn write-edn-object
   "Efficiently write large data structures to a stream."
-  [filepath data]
-  (with-open [^BufferedWriter w (jio/writer filepath)]
-    (.write w (pr-str-fully data))))
+  ([filepath data]
+   (write-edn-object true filepath data))
+  ([unpack-meta? filepath data]
+   (with-open [^BufferedWriter w (jio/writer filepath)]
+     (->> data
+          (pr-str-fully unpack-meta?)
+          (.write w)))))
 
 (defn read-edn-objects ;; not used anywhere - remove???
   "Efficiently multiple data structures from a stream."
@@ -116,15 +132,6 @@
   (let [hsh (-> (MessageDigest/getInstance "MD5")
                 (.digest xs))]
     (.encodeToString (Base64/getEncoder) hsh)))
-
-(defn iobj->edn-tag
-  "Helper fn for constructing ObjectWithMeta wrapper.
-   An object of this type will essentially be serialised
-   as a vector of two elements - the <coll> and its metadata map.
-   It will be read back as <coll> with the right metadata attached."
-  [coll]
-  (assert (some? (meta coll)) "No meta found!")
-  (ObjectWithMeta. coll))
 
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!

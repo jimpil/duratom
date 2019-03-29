@@ -92,16 +92,24 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
 ```
 
 ## Preserving types
-As of version `0.4.2`, `duratom` makes an effort (by default) to support certain (important from an `atom` usage perspective) collections, that are not part of the EDN spec. These are the two built-in sorted collections (map/set), and the somewhat hidden, but otherwise very useful `clojure.lang.PesistentQueue.java`. Therefore, for these particular collections you can expect correct round-tripping (printing/reading), without losing the type along the way. It does this, by outputting custom tags (i.e. `#sorted/map`, `#sorted/set` \& `#queue`), and then reading those back with custom `:readers` (via `clojure.edn/read`). More details can be seen in the `duratom.readers.clj` namespace. If you don't like the default ones, feel free to provide your own, but keep in mind that you need to do it at both ends (reading AND printing). Again, `duratom.readers.clj` showcases how to do this.
+As of version `0.4.2`, `duratom` makes an effort (by default) to support certain (important from an `atom` usage perspective) collections, that are not part of the EDN spec. These are the two built-in sorted collections (map/set), and the somewhat hidden, but otherwise very useful `clojure.lang.PesistentQueue.java`. Therefore, for these particular collections you can expect correct EDN round-tripping (printing/reading), without losing the type along the way. It does this, by outputting custom tags (i.e. `#sorted/map`, `#sorted/set` \& `#queue`), and then reading those back with custom `:readers` (via `clojure.edn/read`). More details can be seen in the `duratom.readers.clj` namespace. If you don't like the default ones, feel free to provide your own, but keep in mind that you need to do it at both ends (reading AND printing). Again, `duratom.readers.clj` showcases how to do this. 
+
+This can be viewed as a breaking change, albeit one that probably won't break any existing programs. If you've previously serialised a sorted-map with `duratom`, you've basically lost the type. Reading it back with 0.4.2, will result in plain map, the same as with any other version (the type is lost forever).
 
 ## Metadata
-Metadata, as conveyed and understood by Clojure, are not part of the EDN spec. Therefore one cannot expect them to be preserved during EDN (de)-serialisation. However, the metadata itself is just another map, and therefore this is not really an issue. If you want this to happen somewhat 'auto-magically', `duratom` includes an object (constructed via `utils/iobj->edn-tag`) which can be used to wrap your collection before passing it for printing. This object is nothing special - in fact it does absolutely nothing! It's a placeholder object which `duratom` prints unpacked into a vector tuple with a special tag `#iobj` - and reads it back with a custom reader which simply packs it back. It does sound rather convenient, and it will work (see `readers_test.clj`), however I would still not recommend actually doing that. It feels way too magical and somewhat indirect. It is completely trivial to do this process manually before `duratom` ever sees your data. Simply unpack the collection into a vector of two elements (the coll and its metadata-map), and pass that to `duratom`. Then at the other end, turning that vector into a collection with some metadata is just a matter of calling `apply with-meta` on it. Despite practically equivalent from a runtime POV, the latter approach will look much more evident (from a source-code POV). The choice is yours ;) 
+Similarly to the aforementioned important types, as of version `0.4.2`, `duratom` also makes an effort (by default) to preserve metadata. It does this by wrapping the collection provided in a special type (constructed via `utils/iobj->edn-tag`), and prints that instead, emitting a special tag `#duratom/iobj`. Then at the other end (reading), a custom reader is provided specifically for this tag. 
+
+If you are content with losing metadata and want to revert to the previous default behaviour, you can do so by overriding the default writer (given your backend). For example the local file-backed `duratom` now uses `ut/write-edn-object` as the default writer. Using `(partial ut/write-edn-object false)` as your writer, will completely sidestep the newly added metadata support (the `#duratom/iobj` tag will never be emitted).
+
+
+Even though this sounds like a major breaking-change, it actually isn't! Similar to the sorted-map example earlier, if you've previously serialised a map (with metadata) with `duratom`, you've lost that metadata. Reading it back with 0.4.2, will result in a  map without metadata, the same as with any other version (the metadata is lost forever). If you then `swap!` with a fn which adds metadata, then that will be custom-printed (with the new custom tag), and read just fine later. 
+
 
 
 ## Requirements
 
-Java >= 8
-Clojure >= 1.9
+- Java >= 8
+- Clojure >= 1.9
 
 ### Optional Requirements
 

@@ -33,13 +33,13 @@
     )
 
   (testing "meta-reader"
-    (testing "auto-conversion via ObjectWithMeta wrapper"
+    (testing "metadata support via the #duratom/iobj tag"
       (let [original-meta {:whatever "foo"}
             original-vector (with-meta [1 2 3 4 5] original-meta)
-            wrapped-vector (ut/iobj->edn-tag original-vector)
-            printed-wrapped (pr-str wrapped-vector)
+            printed-wrapped (ut/pr-str-fully true original-vector)
             read-back (edn/read-string {:readers meta-reader} printed-wrapped)]
         (is (= read-back original-vector))
+        (is (= (class read-back) (class original-vector)))
         (is (= (meta read-back) original-meta))
         )
       )

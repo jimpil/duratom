@@ -174,7 +174,7 @@
 
 (def default-postgres-rw
   {:read ut/read-edn-string  ;; for nippy use `nippy/thaw`
-   :write ut/pr-str-fully    ;; for nippy use `nippy/freeze`
+   :write (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
    :column-type :text        ;; for nippy use :bytea
    })
 
@@ -206,9 +206,9 @@
   ;; Contrast that with `ut/s3-bucket-bytes` which needs to copy the bytes from the S3 input-stream to some output-stream
   ;; (using an internal buffer). In such cases (e.g. nippy encoded bytes), knowing the object size means we can avoid copying entirely.
   {:read (with-meta
-           (partial ut/read-edn-object readers/default)
+           (partial ut/read-edn-object readers/default) ;; this will be called with two args
            {:ignore-size? true}) ;; for nippy use `(comp nippy/thaw ut/s3-bucket-bytes)`
-   :write ut/pr-str-fully  ;; for nippy use `nippy/freeze`
+   :write (partial ut/pr-str-fully true)  ;; for nippy use `nippy/freeze`
    ;:metadata {:server-side-encryption "AES256"}
    })
 

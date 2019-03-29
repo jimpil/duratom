@@ -1,5 +1,7 @@
 (ns duratom.readers
-  (:import (clojure.lang IPersistentMap IPersistentSet PersistentTreeSet PersistentTreeMap PersistentQueue IPersistentVector)
+  (:import (clojure.lang IPersistentMap PersistentTreeMap
+                         IPersistentSet PersistentTreeSet
+                         PersistentQueue IPersistentVector)
            (java.io Writer)))
 
 
@@ -38,11 +40,11 @@
 (defmethod print-method ObjectWithMeta
   [o ^Writer w]
   (let [coll (:o o)]
-    (.write w "#iobj ")
-    (print-method [coll (meta coll)] w)))
+    (.write w "#duratom/iobj ")
+    (vector-print-method [coll (meta coll)] w)))
 
 (def meta-reader
-  {'iobj (partial apply with-meta)})
+  {'duratom/iobj (partial apply with-meta)})
 
 (defmethod print-method PersistentQueue
   [o ^Writer w]
@@ -53,7 +55,7 @@
   {'queue (partial into PersistentQueue/EMPTY)})
 
 (def default
-  "The default set of readers used by duratom."
+  "The default set of EDN readers used by duratom."
   {:readers (merge sorted-readers
                    meta-reader
                    queue-reader)})
