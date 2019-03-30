@@ -91,6 +91,10 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
 
 ```
 
+## Asynchronous commit
+In `duratom` serialisation to storage happens asynchronously (via an `agent`). This ensures minimum overhead (duratoms do feel like regular atoms), and consistency (because writes never arrive _together_). However, this also means that if you manually take a peek at storage without allowing sufficient time for the writes, you might momentarily see inconsistent values. For example, this is precisely why you will find some `Thread/sleep` expressions in the `core_test.clj` namespace.    
+
+
 ## Custom EDN readers
 As of version `0.4.2`, `duratom` makes an effort (by default) to support certain (important from an `atom` usage perspective) collections, that are not part of the EDN spec. These are the two built-in sorted collections (map/set), and the somewhat hidden, but otherwise very useful `clojure.lang.PesistentQueue`. Therefore, for these particular collections you can expect correct EDN round-tripping (printing/reading), without losing the type along the way. It does this, by outputting custom tags (i.e. `#sorted/map`, `#sorted/set` \& `#queue`), and then reading those back with custom `:readers` (via `clojure.edn/read`). More details can be seen in the `duratom.readers.clj` namespace. If you don't like the default ones, feel free to provide your own, but keep in mind that you need to do it at both ends (reading AND printing via `print-method`). Again, `duratom.readers.clj` showcases how to do this. 
 

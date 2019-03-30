@@ -28,8 +28,8 @@
   (commit [_]
     (send-off committer (partial save-to-file! write-it! (.getPath file))))
   (cleanup [_]
-    (or (.delete file)
-        (throw (IOException. (str "Could not delete " (.getPath file)))))) ;; simply delete the file
+    (or (.delete file) ;; simply delete the file
+        (throw (IOException. (str "Could not delete " (.getPath file))))))
   )
 
 ;;===================================<PGSQL>=====================================
