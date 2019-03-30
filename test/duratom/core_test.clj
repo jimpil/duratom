@@ -15,7 +15,7 @@
 
   (Thread/sleep 200)
   (is (= {:z 3 :y 2} @dura))
-  (is (= {:z 3 :y 2} (peek-in-source)))
+  (is (= (peek-in-source) @dura))
 
   (-> dura
       (doto (reset! [1 2 3]))
@@ -23,7 +23,7 @@
 
   (Thread/sleep 200)
   (is (= [2 3] @dura))
-  (is (= [2 3] (peek-in-source)))
+  (is (= (peek-in-source) @dura))
 
   (Thread/sleep 200)
   (is (= [[2 3] [1 2 3]]
@@ -33,10 +33,20 @@
   (is (= [[1 2 3] [2 3]]
          (swap-vals! dura rest)))
 
+  (swap! dura (partial into (sorted-set)))
+  (Thread/sleep 200)
+  (is (sorted? @dura))
+  (is (= (sorted-set 2 3) (peek-in-source) @dura))
+
+  (swap! dura #(with-meta % {:a 1 :b 2}))
+  (Thread/sleep 200)
+  (is (= (sorted-set 2 3) (peek-in-source) @dura))
+  (is (= {:a 1 :b 2} (meta (peek-in-source)) (meta @dura)))
+
   (Thread/sleep 200)
   (destroy dura)
   (Thread/sleep 200)
-  (is (= [2 3] @dura))
+  (is (= #{2 3} @dura))
   (is (thrown? IllegalStateException (swap! dura conj 4)))
   (is (false? (exists?)) "Storage resource was NOT deleted!!!")
   )
@@ -56,7 +66,7 @@
 
     ;; empty file first
     (common* dura
-             #(-> rel-path slurp read-string)
+             #(-> rel-path slurp ut/read-edn-string)
              #(.exists (jio/file rel-path)))
     ;; with-contents thereafter
     (spit rel-path (pr-str init))
@@ -66,7 +76,7 @@
                         :init init)
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))
-             #(-> rel-path slurp read-string)
+             #(-> rel-path slurp ut/read-edn-string)
              #(.exists (jio/file rel-path)))
     )
   )
@@ -93,8 +103,8 @@
 
     ;; empty row first
     (common* dura
-             #(ut/get-pgsql-value db-spec table-name 0 edn/read-string)
-             #(some? (ut/get-pgsql-value db-spec table-name 0 edn/read-string)))
+             #(ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)
+             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)))
     ;; with-contents thereafter
     (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
     (common* (add-watch
@@ -105,8 +115,8 @@
                         :init init)
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" old-state "to" new-state "...")))
-             #(ut/get-pgsql-value db-spec table-name 0 edn/read-string)
-             #(some? (ut/get-pgsql-value db-spec table-name 0 edn/read-string)))
+             #(ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)
+             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)))
     )
   )
 
