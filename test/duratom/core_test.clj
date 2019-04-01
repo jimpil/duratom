@@ -46,6 +46,7 @@
   (Thread/sleep 200)
   (destroy dura)
   (Thread/sleep 200)
+  (is (sorted? @dura))
   (is (= #{2 3} @dura))
   (is (thrown? IllegalStateException (swap! dura conj 4)))
   (is (false? (exists?)) "Storage resource was NOT deleted!!!")
@@ -62,7 +63,8 @@
                         :file-path rel-path
                         :init init)
                :log (fn [k r old-state new-state]
-                      (println "Transitioning from" old-state "to" new-state "...")))]
+                      (println "Transitioning from" (ut/pr-str-fully true old-state)
+                               "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty file first
     (common* dura
@@ -75,7 +77,8 @@
                         :file-path rel-path
                         :init init)
                :log (fn [k r old-state new-state]
-                      (println "Transitioning from" old-state "to" new-state "...")))
+                      (println "Transitioning from" (ut/pr-str-fully true old-state)
+                               "to" (ut/pr-str-fully true new-state) "...")))
              #(-> rel-path slurp ut/read-edn-string)
              #(.exists (jio/file rel-path)))
     )
@@ -99,7 +102,8 @@
                         :row-id 0
                         :init init)
                :log (fn [k, r, old-state, new-state]
-                      (println "Transitioning from" old-state "to" new-state "...")))]
+                      (println "Transitioning from" (ut/pr-str-fully true old-state)
+                               "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty row first
     (common* dura
@@ -114,7 +118,8 @@
                         :row-id 0
                         :init init)
                :log (fn [k, r, old-state, new-state]
-                      (println "Transitioning from" old-state "to" new-state "...")))
+                      (println "Transitioning from" (ut/pr-str-fully true old-state)
+                               "to" (ut/pr-str-fully true new-state) "...")))
              #(ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)
              #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)))
     )

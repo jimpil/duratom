@@ -33,9 +33,11 @@
     coll))
 
 (defn pr-str-fully
-  "Wrapper around `pr-str` which binds *print-length* to nil."
+  "Wrapper around `pr-str` which binds
+   *print-length* & *print-length* to nil."
   ^String [unpack-meta? & xs]
-  (binding [*print-length* nil]
+  (binding [*print-length* nil
+            *print-level* nil]
     (cond->> xs
              unpack-meta? (map iobj->edn-tag)
              true (apply pr-str))))
