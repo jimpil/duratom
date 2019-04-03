@@ -110,7 +110,7 @@ If you are perfectly content with losing metadata and want to revert to the prev
 ## Requirements
 
 - Java >= 8
-- Clojure >= 1.9
+- Clojure >= 1.10
 
 ### Optional Requirements
 
