@@ -92,7 +92,7 @@
            (take-while (partial not= eof))
            doall))))
 
-(def move-opts
+(defonce move-opts
   (into-array [StandardCopyOption/ATOMIC_MOVE
                StandardCopyOption/REPLACE_EXISTING]))
 

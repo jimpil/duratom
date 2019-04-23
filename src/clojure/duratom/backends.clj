@@ -1,7 +1,19 @@
 (ns duratom.backends
   (:require [duratom.utils :as ut])
   (:import (java.io File IOException)
-           (clojure.lang Agent)))
+           (clojure.lang Agent Atom)))
+
+(defprotocol ICommiter
+  (commit! [this f]))
+
+(extend-protocol ICommiter
+  Agent ;; asynchronous
+  (commit! [this f]
+    (send-off this f))
+  Atom  ;; synchronous
+  (commit! [this f]
+    (f this))
+  )
 
 (defprotocol IStorageBackend
   (snapshot [this])
@@ -27,10 +39,7 @@
                                {:file-path path}
                                e)))))))
   (commit [_]
-    (if (instance? Agent committer)
-      (send-off committer (partial save-to-file! write-it! (.getPath file)))
-      ;; if not an agent it will be the underlying raw atom
-      (save-to-file! write-it! (.getPath file) committer)))
+    (commit! committer (partial save-to-file! write-it! (.getPath file))))
   (cleanup [_]
     (or (.delete file) ;; simply delete the file
         (throw (IOException. (str "Could not delete " (.getPath file))))))
@@ -47,10 +56,7 @@
   (snapshot [_]
     (ut/get-pgsql-value config table-name row-id read-it!))
   (commit [_]
-    (if (instance? Agent committer)
-      (send-off committer (partial save-to-db! config table-name row-id write-it!))
-      ;; if not an agent it will be the underlying raw atom
-      (save-to-db! config table-name row-id write-it! committer)))
+    (commit! committer (partial save-to-db! config table-name row-id write-it!)))
   (cleanup [_]
     (ut/delete-relevant-row! config table-name row-id)) ;;drop the relevant row
   )
@@ -67,10 +73,7 @@
   (snapshot [_]
     (ut/get-value-from-s3 credentials bucket k metadata read-it!))
   (commit [_]
-    (if (instance? Agent committer)
-      (send-off committer (partial save-to-s3! credentials bucket k write-it!))
-      ;; if not an agent it will be the underlying raw atom
-      (save-to-s3! credentials bucket k write-it! committer)))
+    (commit! committer (partial save-to-s3! credentials bucket k write-it!)))
   (cleanup [_]
     (ut/delete-object-from-s3 credentials bucket k)) ;;drop the whole object
   )
