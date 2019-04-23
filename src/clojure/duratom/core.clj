@@ -2,7 +2,6 @@
   (:require [duratom.backends :as storage]
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
-            [clojure.edn :as edn]
             [duratom.readers :as readers]
             [duratom.utils :as ut])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
@@ -18,31 +17,31 @@
   (swapVals [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swapVals underlying-atom f)]
+      (let [result (.swapVals underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swapVals underlying-atom f arg1)]
+      (let [result (.swapVals underlying-atom f arg1)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swapVals underlying-atom f arg1 arg2)]
+      (let [result (.swapVals underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swapVals underlying-atom f arg1 arg2 more)]
+      (let [result (.swapVals underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (resetVals [_ newvals]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.resetVals underlying-atom newvals)]
+      (let [result (.resetVals underlying-atom newvals)]
         (storage/commit storage-backend)
         result)))
 
@@ -50,38 +49,38 @@
   (swap [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swap underlying-atom f)]
+      (let [result (.swap underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swap underlying-atom f arg)]
+      (let [result (.swap underlying-atom f arg)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swap underlying-atom f arg1 arg2)]
+      (let [result (.swap underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.swap underlying-atom f arg1 arg2 more)]
+      (let [result (.swap underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (compareAndSet [_ oldv newv]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.compareAndSet underlying-atom oldv newv)]
+      (let [result (.compareAndSet underlying-atom oldv newv)]
         (when result
           (storage/commit storage-backend))
         result)))
   (reset [_ newval]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-                     (let [result (.reset underlying-atom newval)]
+      (let [result (.reset underlying-atom newval)]
         (storage/commit storage-backend)
         result)))
   IRef
@@ -251,10 +250,10 @@
 
 
 (defmulti duratom
-  "Top level constructor function for the <Duratom> class.
+          "Top level constructor function for the <Duratom> class.
    Built-in <backed-by> types are `:local-file`, `:postgres-db` & `:aws-s3`."
-  (fn [backed-by & _args]
-    backed-by))
+          (fn [backed-by & _args]
+            backed-by))
 
 (defmethod duratom :local-file
   [_ & {:keys [file-path init lock rw]
