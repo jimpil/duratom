@@ -1,59 +1,80 @@
 (ns duratom.core-test
   (:require [clojure.test :refer :all]
             [duratom.core :refer :all]
-            [clojure.java.io :as jio]
             [duratom.utils :as ut]
-            [clojure.edn :as edn]
+            [clojure.java.io :as jio]
             [taoensso.nippy :as nippy]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io])
+  (:import (duratom.core Duratom)))
 
 (defn- common*
-  [dura peek-in-source exists?]
-  (-> dura ;; init = {:x 1 :y 2}
-      (doto (swap! assoc :z 3))
-      (doto (swap! dissoc :x)))
+  [^Duratom dura exists? async?]
+  (let [sleep-time 200]
+    (-> dura ;; init = {:x 1 :y 2}
+        (doto (swap! assoc :z 3))
+        (doto (swap! dissoc :x)))
 
-  (Thread/sleep 200)
-  (is (= {:z 3 :y 2} @dura))
-  (is (= (peek-in-source) @dura))
+    (when async?
+      (Thread/sleep sleep-time))
 
-  (-> dura
-      (doto (reset! [1 2 3]))
-      (doto (swap!  (comp vec rest))))
+    (is (= {:z 3 :y 2} @dura))
+    (is (= (backend-snapshot dura) @dura))
 
-  (Thread/sleep 200)
-  (is (= [2 3] @dura))
-  (is (= (peek-in-source) @dura))
+    (-> dura
+        (doto (reset! [1 2 3]))
+        (doto (swap!  (comp vec rest))))
 
-  (Thread/sleep 200)
-  (is (= [[2 3] [1 2 3]]
-         (reset-vals! dura [1 2 3])))
+    (when async?
+      (Thread/sleep sleep-time))
 
-  (Thread/sleep 200)
-  (is (= [[1 2 3] [2 3]]
-         (swap-vals! dura rest)))
+    (is (= [2 3] @dura))
+    (is (= (backend-snapshot dura) @dura))
 
-  (swap! dura (partial into (sorted-set)))
-  (Thread/sleep 200)
-  (is (sorted? @dura))
-  (is (= (sorted-set 2 3) (peek-in-source) @dura))
+    (when async?
+      (Thread/sleep sleep-time))
 
-  (swap! dura #(with-meta % {:a 1 :b 2}))
-  (Thread/sleep 200)
-  (is (= (sorted-set 2 3) (peek-in-source) @dura))
-  (is (= {:a 1 :b 2} (meta (peek-in-source)) (meta @dura)))
+    (is (= [[2 3] [1 2 3]]
+           (reset-vals! dura [1 2 3])))
 
-  (Thread/sleep 200)
-  (destroy dura)
-  (Thread/sleep 200)
-  (is (sorted? @dura))
-  (is (= #{2 3} @dura))
-  (is (thrown? IllegalStateException (swap! dura conj 4)))
-  (is (false? (exists?)) "Storage resource was NOT deleted!!!")
+    (when async?
+      (Thread/sleep sleep-time))
+
+    (is (= [[1 2 3] [2 3]]
+           (swap-vals! dura rest)))
+
+    (swap! dura (partial into (sorted-set)))
+
+    (when async?
+      (Thread/sleep sleep-time))
+
+    (is (sorted? @dura))
+    (is (= (sorted-set 2 3) (backend-snapshot dura) @dura))
+
+    (swap! dura #(with-meta % {:a 1 :b 2}))
+
+    (when async?
+      (Thread/sleep sleep-time))
+
+    (is (= (sorted-set 2 3) (backend-snapshot dura) @dura))
+    (is (= {:a 1 :b 2} (meta (backend-snapshot dura)) (meta @dura)))
+
+    (when async?
+      (Thread/sleep sleep-time))
+
+    (destroy dura)
+
+    (when async?
+      (Thread/sleep sleep-time))
+
+    (is (sorted? @dura))
+    (is (= #{2 3} @dura))
+    (is (thrown? IllegalStateException (swap! dura conj 4)))
+    (is (false? (exists?)) "Storage resource was NOT cleaned-up!!!")
+    )
   )
 
-(deftest file-backed-tests
-  (println "File-backed atom...")
+(defn- file-backed-tests*
+  [async?]
   (let [rel-path "data_temp.txt"
         _ (when (.exists (jio/file rel-path))
             (io/delete-file rel-path)) ;; proper cleanup before testing
@@ -61,32 +82,41 @@
         dura (add-watch
                (duratom :local-file
                         :file-path rel-path
-                        :init init)
+                        :init init
+                        :rw (cond-> default-file-rw
+                                    (not async?) (assoc :write-mode :sync)))
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty file first
-    (common* dura
-             #(-> rel-path slurp ut/read-edn-string)
-             #(.exists (jio/file rel-path)))
+    (common* dura #(.exists (jio/file rel-path)) async?)
     ;; with-contents thereafter
     (spit rel-path (pr-str init))
     (common* (add-watch
                (duratom :local-file
                         :file-path rel-path
-                        :init init)
+                        :init init
+                        :rw (cond-> default-file-rw
+                                    (not async?) (assoc :write-mode :sync)))
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
-             #(-> rel-path slurp ut/read-edn-string)
-             #(.exists (jio/file rel-path)))
+             #(.exists (jio/file rel-path))
+             async?)
     )
   )
 
 
-(deftest postgres-backed-tests
-  (println "PGSQL-backed atom...")
+(deftest file-backed-tests
+  (println "File-backed atom with async commit...")
+  (file-backed-tests* true)
+  (println "File-backed atom with sync commit...")
+  (file-backed-tests* false)
+  )
+
+(defn- postgres-backed-tests*
+  [async?]
   (let [db-spec {:classname   "org.postgresql.Driver"
                  :subprotocol "postgresql"
                  :subname     "//localhost:5432/atomDB"
@@ -100,15 +130,17 @@
                         :db-config db-spec
                         :table-name table-name
                         :row-id 0
-                        :init init)
+                        :init init
+                        :rw (cond-> default-postgres-rw
+                                    (not async?) (assoc :write-mode :sync)))
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty row first
     (common* dura
-             #(ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)
-             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)))
+             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
+             async?)
     ;; with-contents thereafter
     (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
     (common* (add-watch
@@ -116,13 +148,23 @@
                         :db-config db-spec
                         :table-name table-name
                         :row-id 0
-                        :init init)
+                        :init init
+                        :rw (cond-> default-postgres-rw
+                                    (not async?) (assoc :write-mode :sync)))
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
-             #(ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)
-             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string)))
+             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
+             async?)
     )
+  )
+
+
+(deftest postgres-backed-tests
+  (println "PGSQL-backed atom with async commit...")
+  (postgres-backed-tests* true)
+  (println "PGSQL-backed atom with sync commit...")
+  (postgres-backed-tests* false)
   )
 
 (deftest custom-rw-tests
@@ -142,9 +184,7 @@
                         (println "Transitioning from" old-state "to" new-state "...")))]
 
       ;; empty file first
-      (common* dura
-               #(nippy/thaw-from-file rel-path)
-               #(.exists (jio/file rel-path)))
+      (common* dura #(.exists (jio/file rel-path)) true)
       ;; with-contents thereafter
       (nippy/freeze-to-file rel-path init)
       (common* (add-watch
@@ -154,9 +194,8 @@
                                :write nippy/freeze-to-file})
                  :log (fn [k r old-state new-state]
                         (println "Transitioning from" old-state "to" new-state "...")))
-               #(nippy/thaw-from-file rel-path)
-               #(.exists (jio/file rel-path)))
-
+               #(.exists (jio/file rel-path))
+               true)
       )
     )
 
@@ -182,8 +221,8 @@
 
       ;; empty row first
       (common* dura
-               #(ut/get-pgsql-value db-spec table-name 0 nippy/thaw)
-               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw)))
+               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw))
+               true)
       ;; with-contents thereafter
       (ut/update-or-insert! db-spec table-name {:id 0 :value (nippy/freeze init)} ["id = ?" 0])
       (common* (add-watch
@@ -196,8 +235,8 @@
                                :column-type :bytea})
                  :log (fn [k, r, old-state, new-state]
                         (println "Transitioning from" old-state "to" new-state "...")))
-               #(ut/get-pgsql-value db-spec table-name 0 nippy/thaw)
-               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw)))
+               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw))
+               true)
       )
     )
   )

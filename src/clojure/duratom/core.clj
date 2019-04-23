@@ -3,7 +3,8 @@
             [duratom.utils :as ut]
             [clojure.java.io :as jio]
             [clojure.edn :as edn]
-            [duratom.readers :as readers])
+            [duratom.readers :as readers]
+            [duratom.utils :as ut])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer)))
@@ -17,31 +18,31 @@
   (swapVals [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f)]
+                     (let [result (.swapVals underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f arg1)]
+                     (let [result (.swapVals underlying-atom f arg1)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f arg1 arg2)]
+                     (let [result (.swapVals underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swapVals [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f arg1 arg2 more)]
+                     (let [result (.swapVals underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (resetVals [_ newvals]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.resetVals underlying-atom newvals)]
+                     (let [result (.resetVals underlying-atom newvals)]
         (storage/commit storage-backend)
         result)))
 
@@ -49,38 +50,38 @@
   (swap [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f)]
+                     (let [result (.swap underlying-atom f)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f arg)]
+                     (let [result (.swap underlying-atom f arg)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f arg1 arg2)]
+                     (let [result (.swap underlying-atom f arg1 arg2)]
         (storage/commit storage-backend)
         result)))
   (swap [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f arg1 arg2 more)]
+                     (let [result (.swap underlying-atom f arg1 arg2 more)]
         (storage/commit storage-backend)
         result)))
   (compareAndSet [_ oldv newv]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.compareAndSet underlying-atom oldv newv)]
+                     (let [result (.compareAndSet underlying-atom oldv newv)]
         (when result
           (storage/commit storage-backend))
         result)))
   (reset [_ newval]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.reset underlying-atom newval)]
+                     (let [result (.reset underlying-atom newval)]
         (storage/commit storage-backend)
         result)))
   IRef
@@ -117,13 +118,16 @@
   (.write w "}")
   )
 
+(defonce ASYNC_WRITE :async)
 
 (defn- ->Duratom
-  [make-backend lock init]
+  [make-backend lock init write-mode]
   (assert (ut/lock? lock)
           "The <lock> provided is NOT a valid implementation of `java.util.concurrent.locks.Lock`!")
   (let [raw-atom (atom nil)
-        backend (make-backend (agent raw-atom))
+        backend (cond-> raw-atom
+                        (= ASYNC_WRITE write-mode) agent
+                        true make-backend)
         duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
         storage-init (storage/snapshot backend)]
     (if (some? storage-init) ;; found stuff - sync it
@@ -134,8 +138,9 @@
               (some? init) (doto (reset! init)))))) ;; empty storage means we start off with <initial-value>
 
 (defn- map->Duratom [m]
-  (let [[make-backend lock initial-value] ((juxt :make-backend :lock :init) m)]
-    (->Duratom make-backend lock initial-value)))
+  (let [[make-backend lock initial-value write-mode]
+        ((juxt :make-backend :lock :init :wmode) m)]
+    (->Duratom make-backend lock initial-value write-mode)))
 
 
 ;;==================<PUBLIC API>==========================
@@ -144,15 +149,24 @@
   "Convenience fn for cleaning up the persistent storage of a duratom."
   [^Duratom dura]
   (let [storage (.-storage_backend dura)
-        release (.-release dura)]
-    (storage/cleanup storage)
-    (release true)))
+        release (.-release dura)
+        lock    (.-lock dura)]
+    (ut/with-locking lock
+      (storage/cleanup storage)
+      (release true))))
+
+
+(defn backend-snapshot
+  "Convenience fn for acquiring a snapshot of
+   the persistent storage of a duratom."
+  [^Duratom dura]
+  (storage/snapshot (.-storage_backend dura)))
 
 
 (def default-file-rw
-  {:read  ut/read-edn-object ;; for nippy use `nippy/thaw-from-file`
-   :write ut/write-edn-object ;; for nippy use `nippy/freeze-to-file`
-   })
+  {:read       ut/read-edn-object ;; for nippy use `nippy/thaw-from-file`
+   :write      ut/write-edn-object ;; for nippy use `nippy/freeze-to-file`
+   :write-mode ASYNC_WRITE})
 
 (defn file-atom
   "Creates and returns a file-backed atom (on the local filesystem). If the file exists,
@@ -169,14 +183,14 @@
                                            (.createNewFile))
                                          (:read rw)
                                          (:write rw))
-                  })))
+                  :wmode (:write-mode rw ASYNC_WRITE)})))
 
 
 (def default-postgres-rw
-  {:read ut/read-edn-string  ;; for nippy use `nippy/thaw`
-   :write (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
+  {:read        ut/read-edn-string  ;; for nippy use `nippy/thaw`
+   :write       (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
    :column-type :text        ;; for nippy use :bytea
-   })
+   :write-mode  ASYNC_WRITE})
 
 (defn postgres-atom
   "Creates and returns a PostgreSQL-backed atom. If the location denoted by the combination of <db-config> and <table-name> exists,
@@ -199,7 +213,7 @@
                                          row-id
                                          (:read rw)
                                          (:write rw))
-                  })))
+                  :wmode (:write-mode rw ASYNC_WRITE)})))
 
 (def default-s3-rw
   ;; `edn/read` doesn't make use of the object size, so no reason to fetch it from S3 (we communicate that via metadata).
@@ -209,6 +223,7 @@
            (partial ut/read-edn-object readers/default) ;; this will be called with two args
            {:ignore-size? true}) ;; for nippy use `(comp nippy/thaw ut/s3-bucket-bytes)`
    :write (partial ut/pr-str-fully true)  ;; for nippy use `nippy/freeze`
+   :write-mode ASYNC_WRITE
    ;:metadata {:server-side-encryption "AES256"}
    })
 
@@ -232,7 +247,7 @@
                                          (:metadata rw)
                                          (:read rw)
                                          (:write rw))
-                  })))
+                  :wmode (:write-mode rw ASYNC_WRITE)})))
 
 
 (defmulti duratom
