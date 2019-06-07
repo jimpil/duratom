@@ -117,15 +117,22 @@
   (.write w "}")
   )
 
-(defonce ASYNC_WRITE :async)
+(defonce DEFAULT_COMMIT_MODE ::async)
+
+(defn- async?
+  "Returns true if the commit-mode <cmode>
+   provided is either nil or ::async."
+  [cmode]
+  (or (= cmode DEFAULT_COMMIT_MODE)
+      (nil? cmode)))
 
 (defn- ->Duratom
-  [make-backend lock init write-mode]
+  [make-backend lock init commits]
   (assert (ut/lock? lock)
           "The <lock> provided is NOT a valid implementation of `java.util.concurrent.locks.Lock`!")
   (let [raw-atom (atom nil)
         backend (cond-> raw-atom
-                        (= ASYNC_WRITE write-mode) agent
+                        (async? commits) agent
                         true make-backend)
         duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
         storage-init (storage/snapshot backend)]
@@ -137,9 +144,9 @@
               (some? init) (doto (reset! init)))))) ;; empty storage means we start off with <initial-value>
 
 (defn- map->Duratom [m]
-  (let [[make-backend lock initial-value write-mode]
-        ((juxt :make-backend :lock :init :wmode) m)]
-    (->Duratom make-backend lock initial-value write-mode)))
+  (let [[make-backend lock initial-value commit-mode]
+        ((juxt :make-backend :lock :init :commit-mode) m)]
+    (->Duratom make-backend lock initial-value commit-mode)))
 
 
 ;;==================<PUBLIC API>==========================
@@ -163,9 +170,10 @@
 
 
 (def default-file-rw
-  {:read       ut/read-edn-object ;; for nippy use `nippy/thaw-from-file`
-   :write      ut/write-edn-object ;; for nippy use `nippy/freeze-to-file`
-   :write-mode ASYNC_WRITE})
+  {:read  ut/read-edn-object  ;; for nippy use `nippy/thaw-from-file`
+   :write ut/write-edn-object ;; for nippy use `nippy/freeze-to-file`
+   :commit-mode DEFAULT_COMMIT_MODE} ;; technically not needed but leaving it for transparency
+  )
 
 (defn file-atom
   "Creates and returns a file-backed atom (on the local filesystem). If the file exists,
@@ -175,21 +183,23 @@
   ([file-path lock initial-value]
    (file-atom file-path lock initial-value default-file-rw))
   ([file-path lock initial-value rw] ;;read-write details
-   (map->Duratom {:lock lock ;; allow for explicit nil
-                  :init initial-value
-                  :make-backend (partial storage/->FileBackend
-                                         (doto (jio/file file-path)
-                                           (.createNewFile))
-                                         (:read rw)
-                                         (:write rw))
-                  :wmode (:write-mode rw ASYNC_WRITE)})))
+   (map->Duratom (merge
+                   {:lock lock ;; allow for explicit nil
+                    :init initial-value
+                    :make-backend (partial storage/->FileBackend
+                                           (doto (jio/file file-path)
+                                             (.createNewFile))
+                                           (:read rw)
+                                           (:write rw))}
+                   (select-keys rw [:commit-mode])))))
 
 
 (def default-postgres-rw
-  {:read        ut/read-edn-string  ;; for nippy use `nippy/thaw`
-   :write       (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
-   :column-type :text        ;; for nippy use :bytea
-   :write-mode  ASYNC_WRITE})
+  {:read  ut/read-edn-string             ;; for nippy use `nippy/thaw`
+   :write (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
+   :column-type :text                    ;; for nippy use :bytea
+   :commit-mode DEFAULT_COMMIT_MODE} ;; technically not needed but leaving it for transparency
+  )
 
 (defn postgres-atom
   "Creates and returns a PostgreSQL-backed atom. If the location denoted by the combination of <db-config> and <table-name> exists,
@@ -201,18 +211,19 @@
   ([db-config table-name row-id lock initial-value]
    (postgres-atom db-config table-name row-id lock initial-value default-postgres-rw))
   ([db-config table-name row-id lock initial-value rw]
-   (map->Duratom {:lock lock
-                  :init initial-value
-                  :make-backend (partial storage/->PGSQLBackend
-                                         db-config
-                                         (if (ut/table-exists? db-config table-name)
-                                           table-name
-                                           (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
-                                               table-name))
-                                         row-id
-                                         (:read rw)
-                                         (:write rw))
-                  :wmode (:write-mode rw ASYNC_WRITE)})))
+   (map->Duratom (merge
+                   {:lock lock
+                    :init initial-value
+                    :make-backend (partial storage/->PGSQLBackend
+                                           db-config
+                                           (if (ut/table-exists? db-config table-name)
+                                             table-name
+                                             (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
+                                                 table-name))
+                                           row-id
+                                           (:read rw)
+                                           (:write rw))}
+                   (select-keys rw [:commit-mode])))))
 
 (def default-s3-rw
   ;; `edn/read` doesn't make use of the object size, so no reason to fetch it from S3 (we communicate that via metadata).
@@ -221,8 +232,8 @@
   {:read (with-meta
            (partial ut/read-edn-object readers/default) ;; this will be called with two args
            {:ignore-size? true}) ;; for nippy use `(comp nippy/thaw ut/s3-bucket-bytes)`
-   :write (partial ut/pr-str-fully true)  ;; for nippy use `nippy/freeze`
-   :write-mode ASYNC_WRITE
+   :write      (partial ut/pr-str-fully true)  ;; for nippy use `nippy/freeze`
+   :commit-mode DEFAULT_COMMIT_MODE ;; technically not needed but leaving it for transparency
    ;:metadata {:server-side-encryption "AES256"}
    })
 
@@ -234,19 +245,20 @@
   ([creds bucket k lock initial-value]
    (s3-atom creds bucket k lock initial-value default-s3-rw))
   ([creds bucket k lock initial-value rw]
-   (map->Duratom {:lock         lock
-                  :init         initial-value
-                  :make-backend (partial storage/->S3Backend
-                                         creds
-                                         (if (ut/bucket-exists? creds bucket)
-                                           bucket
-                                           (do (ut/create-s3-bucket creds bucket)
-                                               bucket))
-                                         k
-                                         (:metadata rw)
-                                         (:read rw)
-                                         (:write rw))
-                  :wmode (:write-mode rw ASYNC_WRITE)})))
+   (map->Duratom (merge
+                   {:lock lock
+                    :init initial-value
+                    :make-backend (partial storage/->S3Backend
+                                           creds
+                                           (if (ut/bucket-exists? creds bucket)
+                                             bucket
+                                             (do (ut/create-s3-bucket creds bucket)
+                                                 bucket))
+                                           k
+                                           (:metadata rw)
+                                           (:read rw)
+                                           (:write rw))}
+                   (select-keys rw [:commit-mode])))))
 
 
 (defmulti duratom

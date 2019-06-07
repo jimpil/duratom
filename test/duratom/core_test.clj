@@ -84,7 +84,7 @@
                         :file-path rel-path
                         :init init
                         :rw (cond-> default-file-rw
-                                    (not async?) (assoc :write-mode :sync)))
+                                    (not async?) (assoc :commit-mode :sync)))
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))]
@@ -98,7 +98,7 @@
                         :file-path rel-path
                         :init init
                         :rw (cond-> default-file-rw
-                                    (not async?) (assoc :write-mode :sync)))
+                                    (not async?) (assoc :commit-mode :sync)))
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
@@ -132,7 +132,7 @@
                         :row-id 0
                         :init init
                         :rw (cond-> default-postgres-rw
-                                    (not async?) (assoc :write-mode :sync)))
+                                    (not async?) (assoc :commit-mode :sync)))
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))]
@@ -150,7 +150,7 @@
                         :row-id 0
                         :init init
                         :rw (cond-> default-postgres-rw
-                                    (not async?) (assoc :write-mode :sync)))
+                                    (not async?) (assoc :commit-mode :sync)))
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
