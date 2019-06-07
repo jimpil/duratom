@@ -91,8 +91,11 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
 
 ```
 
-## Asynchronous commit
-In `duratom` persisting to storage happens asynchronously (via an `agent`). This ensures minimum overhead  (duratoms feel like regular atoms regardless of the storage backend), but more importantly safety (writes never collide). However, this also means that if you *manually* take a peek at storage without allowing sufficient time for the writes, you might momentarily see inconsistent values between the duratom and its storage. That is not a problem though, it just means that the state of the duratom won't necessarily be the same as the persisted state at *all* times. For instance, this is precisely why you will find some `Thread/sleep` expressions in the `core_test.clj` namespace.    
+## Asynchronous commits (by default)
+In `duratom` persisting to storage happens asynchronously (via an `agent`). This ensures minimum overhead  (duratoms feel like regular atoms regardless of the storage backend), but more importantly safety (writes never collide). However, this also means that if you *manually* take a peek at storage without allowing sufficient time for the writes, you might momentarily see inconsistent values between the duratom and its storage. That is not a problem though, it just means that the state of the duratom won't necessarily be the same as the persisted state at *all* times. For instance, this is precisely why you will find some `Thread/sleep` expressions in the `core_test.clj` namespace. 
+
+If you're not comfortable with the above, or if for whatever reason you prefer synchronous commits, `duratom 0.4.3` adds support for them. You just need to provide some value as the `:commit-mode` in your `rw` map. That value can be anything but nil, nor `:duratom.core/async` (I use `:sync` in the unit-tests) as these two are reserved for async commits. Consequently, existing users that were relying on custom readers/writers are not affected.  
+   
 
 
 ## Default EDN readers
