@@ -42,7 +42,7 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
 
 ;; backed by postgres-db
 (duratom :postgres-db
-         :db-config "any db-spec understood by clojure.java.jdbc"
+         :db-config "any db-spec as understood by clojure.java.jdbc"
          :table-name "my_table"
          :row-id 0
          :init {:x 1 :y 2})
@@ -55,7 +55,7 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
          :init {:x 1 :y 2})
 ```
 
-The initial-value <init> is ignored, unless the underlying persistent storage is found to be empty.
+The initial-value <init> can be a concrete value, a no-arg fn, or a delay, but will be ignored if the underlying persistent storage is found to be non-empty.
 If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom` & `s3-atom` equivalents.
 
 ## Custom :read & :write

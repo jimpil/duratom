@@ -135,6 +135,12 @@
                 (.digest xs))]
     (.encodeToString (Base64/getEncoder) hsh)))
 
+(defn ->init
+  [x]
+  (if (fn? x)
+    (x)
+    (force x))) ;; `force` returns x if not a delay
+
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!
   "Updates columns or inserts a new row in the specified table."

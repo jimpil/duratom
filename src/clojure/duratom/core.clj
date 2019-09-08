@@ -141,7 +141,8 @@
         (reset! raw-atom storage-init)
         duratom)
       (cond-> duratom
-              (some? init) (doto (reset! init)))))) ;; empty storage means we start off with <initial-value>
+              (some? init)
+              (doto (reset! (ut/->init init))))))) ;; empty storage means we start off with <initial-value>
 
 (defn- map->Duratom [m]
   (let [[make-backend lock initial-value commit-mode]
