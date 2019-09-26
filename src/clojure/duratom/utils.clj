@@ -22,6 +22,11 @@
   (catch Exception e
     (require '[duratom.not-found.s3 :as aws])))
 
+(try
+  (require '[taoensso.carmine :as car])
+  (catch Exception e
+    (require '[duratom.not-found.redis :as car])))
+
 (defn iobj->edn-tag
   "Helper fn for constructing ObjectWithMeta wrapper.
    An object of this type will essentially be serialised
@@ -205,3 +210,17 @@
 
 (defn bucket-exists? [creds bucket-name]
   (aws/does-bucket-exist creds bucket-name))
+
+;;===============<REDIS-UTILS>=====================================
+
+(defn redis-get [db-config key-name]
+  (car/wcar db-config (car/get key-name)))
+
+(defn redis-set [db-config key-name value]
+  (car/wcar db-config (car/set key-name value)))
+
+(defn redis-del [db-config key-name]
+  (car/wcar db-config (car/del key-name)))
+
+(defn redis-key-exists? [db-config key-name]
+  (= 1 (car/wcar db-config (car/exists key-name))))

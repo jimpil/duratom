@@ -77,3 +77,16 @@
   (cleanup [_]
     (ut/delete-object-from-s3 credentials bucket k)) ;;drop the whole object
   )
+
+;;==========================<REDIS>=============================================
+
+(defrecord RedisBackend [conn key-name read-it! write-it! committer]
+  IStorageBackend
+  (snapshot [_]
+    (read-it! (ut/redis-get conn key-name)))
+  (commit [_]
+    (commit! committer (fn [state-atom]
+                         (ut/redis-set conn key-name (write-it! @state-atom))
+                         state-atom)))
+  (cleanup [_]
+    (ut/redis-del conn key-name)))

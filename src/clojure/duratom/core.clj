@@ -261,6 +261,21 @@
                                            (:write rw))}
                    (select-keys rw [:commit-mode])))))
 
+(def default-redis-rw
+  {:read  identity ;Redis library Carmine automatically uses Nippu for serialization/deserialization
+   :write identity ;Redis library Carmine automatically uses Nippu for serialization/deserialization
+   :commit-mode DEFAULT_COMMIT_MODE}) ;; technically not needed but leaving it for transparency)
+
+(defn redis-atom [db-config key-name lock initial-value rw]
+  (map->Duratom (merge
+                  {:lock lock
+                   :init initial-value
+                   :make-backend (partial storage/->RedisBackend
+                                          db-config
+                                          key-name
+                                          (:read rw)
+                                          (:write rw))}
+                  (select-keys rw [:commit-mode]))))
 
 (defmulti duratom
           "Top level constructor function for the <Duratom> class.
@@ -286,4 +301,8 @@
              rw default-s3-rw}}]
   (s3-atom credentials bucket key lock init rw))
 
-
+(defmethod duratom :redis-db
+  [_ & {:keys [db-config key-name init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-redis-rw}}]
+  (redis-atom db-config key-name lock init rw))
