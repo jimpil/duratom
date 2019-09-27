@@ -167,6 +167,41 @@
   (postgres-backed-tests* false)
   )
 
+(defn- redis-backed-tests*
+  [async?]
+  (let [db-config  {:pool {} :spec {:uri "redis://localhost/"}}
+        key-name "atom:state"
+        init {:x 1 :y 2}
+        key-exists? #(ut/redis-key-exists? db-config key-name)
+        _ (ut/redis-del db-config key-name)
+        dura (duratom :redis-db
+                      :db-config db-config
+                      :key-name key-name
+                      :init init
+                      :rw (cond-> default-redis-rw
+                            (not async?) (assoc :commit-mode :sync)))]
+    ;; empty key first
+    (common* dura
+             key-exists?
+             async?)
+    ;; with contents
+    (ut/redis-set db-config key-name init)
+    (common* (duratom :redis-db
+                      :db-config db-config
+                      :key-name key-name
+                      :init init
+                      :rw (cond-> default-redis-rw
+                            (not async?) (assoc :commit-mode :sync)))
+             key-exists?
+             async?)))
+
+(deftest redis-backed-tests
+  (println "Redis-backed atom with async commit...")
+  (redis-backed-tests* true)
+  (println "Redis-backed atom with sync commit...")
+  (redis-backed-tests* false)
+  )
+
 (deftest custom-rw-tests
 
   (testing "File-backed atom containing `nippy` bytes..."
