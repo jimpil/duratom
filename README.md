@@ -120,6 +120,10 @@ If you are perfectly content with losing metadata and want to revert to the prev
 - [clojure.java.jdbc](https://github.com/clojure/java.jdbc) >= 0.6.0
 - [amazonica](https://github.com/mcohen01/amazonica)
 
+## Development
+
+Start databases with a command `docker-compose up` before running the tests
+
 ## License
 
 Copyright © 2016 Dimitrios Piliouras

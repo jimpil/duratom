@@ -120,7 +120,7 @@
   (let [db-spec {:classname   "org.postgresql.Driver"
                  :subprotocol "postgresql"
                  :subname     "//localhost:5432/atomDB"
-                 :username    "dimitris"
+                 :user        "dimitris"
                  :password    "secret"}
         table-name "atom_state"
         _ (ut/delete-relevant-row! db-spec table-name 0)
@@ -203,7 +203,7 @@
     (let [db-spec {:classname   "org.postgresql.Driver"
                    :subprotocol "postgresql"
                    :subname     "//localhost:5432/atomDB"
-                   :username    "dimitris"
+                   :user        "dimitris"
                    :password    "secret"}
           table-name "atom_state_bytes"
           init {:x 1 :y 2}
