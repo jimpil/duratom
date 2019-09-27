@@ -15,6 +15,7 @@ In order to provide durability `duratom` will persist its state to some durable-
  1. A file on the local file-system
  2. A postgres DB table row
  3. An AWS-S3 bucket key
+ 4. A Redis DB key
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
@@ -53,6 +54,12 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
          :bucket "my_bucket"
          :key "0"
          :init {:x 1 :y 2})
+
+;; backed by Redis
+(duratom :redis-db
+         :db-config "any db-spec as understood by carmine"
+         :key-name "my:key"
+         :init {:x 1 :y 2})
 ```
 
 The initial-value <init> can be a concrete value (as show above), but also a no-arg fn or a delay. In any case, it may end up being completely ignored (i.e. if the underlying persistent storage is found to be non-empty).
@@ -89,6 +96,13 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
          :rw {:read (comp nippy/thaw utils/s3-bucket-bytes)
               :write nippy/freeze})          
 
+;;Carmine uses Nippy under the hood for Redis when Clojure types are passed in directly
+(duratom :redis-db
+         :db-config "any db-spec as understood by carmine"
+         :key-name "my:key"
+         :init {:x 1 :y 2}
+         :rw {:read identity
+              :write identity})
 ```
 
 ## Asynchronous commits (by default)
@@ -119,6 +133,7 @@ If you are perfectly content with losing metadata and want to revert to the prev
 
 - [clojure.java.jdbc](https://github.com/clojure/java.jdbc) >= 0.6.0
 - [amazonica](https://github.com/mcohen01/amazonica)
+- [carmine](https://github.com/ptaoussanis/carmine)
 
 ## Development
 
