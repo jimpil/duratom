@@ -268,16 +268,23 @@
    :write (partial ut/pr-str-fully true)
    :commit-mode DEFAULT_COMMIT_MODE}) ;; technically not needed but leaving it for transparency)
 
-(defn redis-atom [db-config key-name lock initial-value rw]
-  (map->Duratom (merge
-                  {:lock lock
-                   :init initial-value
-                   :make-backend (partial storage/->RedisBackend
-                                          db-config
-                                          key-name
-                                          (:read rw)
-                                          (:write rw))}
-                  (select-keys rw [:commit-mode]))))
+(defn redis-atom
+  "Creates and returns a Redis-backed atom. If the location denoted by the combination of <db-config> and <key-name> exists,
+  it is read and becomes the initial value. Otherwise, the initial value is <init> and the key <key-name> is updated."
+  ([db-config key-name]
+   (redis-atom db-config key-name (ReentrantLock.) nil))
+  ([db-config key-name lock initial-value]
+   (redis-atom db-config key-name lock initial-value default-redis-rw))
+  ([db-config key-name lock initial-value rw]
+   (map->Duratom (merge
+                   {:lock lock
+                    :init initial-value
+                    :make-backend (partial storage/->RedisBackend
+                                           db-config
+                                           key-name
+                                           (:read rw)
+                                           (:write rw))}
+                   (select-keys rw [:commit-mode])))))
 
 (defmulti duratom
           "Top level constructor function for the <Duratom> class.
