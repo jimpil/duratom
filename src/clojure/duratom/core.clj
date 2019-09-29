@@ -262,8 +262,10 @@
                    (select-keys rw [:commit-mode])))))
 
 (def default-redis-rw
-  {:read  identity ;Redis library Carmine automatically uses Nippu for serialization/deserialization
-   :write identity ;Redis library Carmine automatically uses Nippu for serialization/deserialization
+  {;; Redis library Carmine automatically uses Nippy for serialization/deserialization Clojure types
+   ;; So by just replacing these functions with `identity` they will be serialized with Nippy
+   :read  ut/read-edn-string
+   :write (partial ut/pr-str-fully true)
    :commit-mode DEFAULT_COMMIT_MODE}) ;; technically not needed but leaving it for transparency)
 
 (defn redis-atom [db-config key-name lock initial-value rw]

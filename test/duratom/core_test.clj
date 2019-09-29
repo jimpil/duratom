@@ -185,7 +185,7 @@
              key-exists?
              async?)
     ;; with contents
-    (ut/redis-set db-config key-name init)
+    (ut/redis-set db-config key-name (pr-str init))
     (common* (duratom :redis-db
                       :db-config db-config
                       :key-name key-name
@@ -274,5 +274,34 @@
                true)
       )
     )
-  )
+
+  (testing "Redis DB-backed atom containing `nippy` bytes..."
+    (let [db-config  {:pool {} :spec {:uri "redis://localhost/"}}
+          key-name "atom:state:bytes"
+          key-exists? #(ut/redis-key-exists? db-config key-name)
+          init {:x 1 :y 2}
+          dura (duratom :redis-db
+                        :db-config db-config
+                        :key-name key-name
+                        :init init
+                        :rw {:read  identity
+                             :write identity})]
+
+      ;; empty row first
+      (common* dura
+               key-exists?
+               true)
+      ;; with-contents thereafter
+      (ut/redis-set db-config key-name init)
+      (common* (duratom :redis-db
+                        :db-config db-config
+                        :key-name key-name
+                        :init init
+                        :rw {:read  identity
+                             :write identity})
+               key-exists?
+               true)
+      )
+    )
+)
 
