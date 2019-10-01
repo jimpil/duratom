@@ -26,7 +26,7 @@ Main difference between `duratom` & `enduro` is that an `enduro` atom is not a d
 
 Main difference between `duratom` & `durable-atom` is that a `durable-atom` atom doesn't have a second level of polymorphism to accommodate for switching storage backends. It assumes that a file-backed atom is always what you want. Moreover, it uses `slurp` & `spit` for reading/writing to the disk, which, in practice, puts a limit on how big data-structures you can fit in a String (depending on your hardware & JVM configuration of course). Finally, it uses `locking` which is problematic on some JVMs (e.g. certain IBM JVM versions). `duratom` uses the `java.util.concurrent.locks.Lock` interface instead.
 
-(*) Redis is an in-memory data structure store with optional persistence. It might not be the best option in those cases where you absolutely cannot lose the state backed by `duratom`. In other use cases it is a fast, flexible and lightweight backend option for the durable atom.
+(*) Redis is an in-memory data structure store with optional [persistence](https://redis.io/topics/persistence). It might not be the best option in those cases where you absolutely cannot lose the state backed by `duratom`. But if you can, it is a fast, flexible and lightweight backend option for the durable atom. Moreover, it's worth noting that the value in the atom (wrapped by duratom) will exist in two places in memory (regular atom + Redis).
 
 ## Usage
 
