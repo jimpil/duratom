@@ -149,9 +149,9 @@ Another option is to use the provided Docker compose configuration in the follow
 
 1. Install [docker](https://docs.docker.com/install/), [docker-machine](https://docs.docker.com/machine/install-machine/), [docker-compose](https://docs.docker.com/compose/install/), and finally VirtualBox.
 2. Create a docker-machine with command `docker-machine create default` (one-off step).
-3. Start all databases with command `docker-compose up`.
+3. Start all databases with command `docker-compose up -d` (or omit the `-d` to spawn the process in the foreground).
 4. Now you can run tests freely.
-5. When you are done with the development/testing, stop the databases by running `docker-compose down` (or simply `Ctrl-c` once).
+5. When you are done with the development/testing, stop the databases by running `docker-compose down` (or simply `Ctrl-c` once if you didn't use `-d`).
 
 ## License
 
