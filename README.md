@@ -15,7 +15,7 @@ In order to provide durability `duratom` will persist its state to some durable-
  1. A file on the local file-system
  2. A postgres DB table row
  3. An AWS-S3 bucket key
- 4. A Redis DB key
+ 4. A Redis DB key (*)
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
@@ -25,6 +25,8 @@ Main difference between `duratom` & `enduro` is that an `enduro` atom is not a d
   2. it requires the watches/validators to be provided in atoms upon construction.
 
 Main difference between `duratom` & `durable-atom` is that a `durable-atom` atom doesn't have a second level of polymorphism to accommodate for switching storage backends. It assumes that a file-backed atom is always what you want. Moreover, it uses `slurp` & `spit` for reading/writing to the disk, which, in practice, puts a limit on how big data-structures you can fit in a String (depending on your hardware & JVM configuration of course). Finally, it uses `locking` which is problematic on some JVMs (e.g. certain IBM JVM versions). `duratom` uses the `java.util.concurrent.locks.Lock` interface instead.
+
+(*) Redis is an in-memory data structure store with optional persistence. It might not be the best option in those cases where you absolutely cannot lose the state backed by `duratom`. In other use cases it is a fast, flexible and lightweight backend option for the durable atom.
 
 ## Usage
 
