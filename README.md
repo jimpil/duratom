@@ -139,7 +139,15 @@ If you are perfectly content with losing metadata and want to revert to the prev
 
 ## Development
 
-Start databases with a command `docker-compose up` before running the tests
+Tests require PostreSQL and Redis server installed on your machine.
+
+Another option is to use the provided Docker compose configuration in a following way:
+
+1. Install [Docker](https://docs.docker.com/install)
+2. Install [Docker Compose](https://docs.docker.com/compose/install/)
+3. Start all databases with command `docker-compose up`
+4. Now you can run tests freely
+5. When you are finished with the development stop the database by running `docker-compose down`
 
 ## License
 
