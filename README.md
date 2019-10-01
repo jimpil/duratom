@@ -15,6 +15,7 @@ In order to provide durability `duratom` will persist its state to some durable-
  1. A file on the local file-system
  2. A postgres DB table row
  3. An AWS-S3 bucket key
+ 4. A Redis DB key (*)
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
@@ -24,6 +25,8 @@ Main difference between `duratom` & `enduro` is that an `enduro` atom is not a d
   2. it requires the watches/validators to be provided in atoms upon construction.
 
 Main difference between `duratom` & `durable-atom` is that a `durable-atom` atom doesn't have a second level of polymorphism to accommodate for switching storage backends. It assumes that a file-backed atom is always what you want. Moreover, it uses `slurp` & `spit` for reading/writing to the disk, which, in practice, puts a limit on how big data-structures you can fit in a String (depending on your hardware & JVM configuration of course). Finally, it uses `locking` which is problematic on some JVMs (e.g. certain IBM JVM versions). `duratom` uses the `java.util.concurrent.locks.Lock` interface instead.
+
+(*) Redis is an in-memory data structure store with optional persistence. It might not be the best option in those cases where you absolutely cannot lose the state backed by `duratom`. In other use cases it is a fast, flexible and lightweight backend option for the durable atom.
 
 ## Usage
 
@@ -52,6 +55,12 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
          :credentials "as understood by amazonica"
          :bucket "my_bucket"
          :key "0"
+         :init {:x 1 :y 2})
+
+;; backed by Redis
+(duratom :redis-db
+         :db-config "any db-spec as understood by carmine"
+         :key-name "my:key"
          :init {:x 1 :y 2})
 ```
 
@@ -89,6 +98,13 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
          :rw {:read (comp nippy/thaw utils/s3-bucket-bytes)
               :write nippy/freeze})          
 
+;;Carmine uses Nippy under the hood for Redis when Clojure types are passed in directly
+(duratom :redis-db
+         :db-config "any db-spec as understood by carmine"
+         :key-name "my:key"
+         :init {:x 1 :y 2}
+         :rw {:read identity
+              :write identity})
 ```
 
 ## Asynchronous commits (by default)
@@ -119,6 +135,19 @@ If you are perfectly content with losing metadata and want to revert to the prev
 
 - [clojure.java.jdbc](https://github.com/clojure/java.jdbc) >= 0.6.0
 - [amazonica](https://github.com/mcohen01/amazonica)
+- [carmine](https://github.com/ptaoussanis/carmine)
+
+## Development
+
+Tests require PostreSQL and Redis server installed on your machine.
+
+Another option is to use the provided Docker compose configuration in a following way:
+
+1. Install [Docker](https://docs.docker.com/install)
+2. Install [Docker Compose](https://docs.docker.com/compose/install/)
+3. Start all databases with command `docker-compose up`
+4. Now you can run tests freely
+5. When you are finished with the development stop the database by running `docker-compose down`
 
 ## License
 

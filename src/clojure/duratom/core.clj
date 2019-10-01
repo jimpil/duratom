@@ -261,6 +261,30 @@
                                            (:write rw))}
                    (select-keys rw [:commit-mode])))))
 
+(def default-redis-rw
+  {;; Redis library Carmine automatically uses Nippy for serialization/deserialization Clojure types
+   ;; So by just replacing these functions with `identity` they will be serialized with Nippy
+   :read  ut/read-edn-string
+   :write (partial ut/pr-str-fully true)
+   :commit-mode DEFAULT_COMMIT_MODE}) ;; technically not needed but leaving it for transparency)
+
+(defn redis-atom
+  "Creates and returns a Redis-backed atom. If the location denoted by the combination of <db-config> and <key-name> exists,
+  it is read and becomes the initial value. Otherwise, the initial value is <init> and the key <key-name> is updated."
+  ([db-config key-name]
+   (redis-atom db-config key-name (ReentrantLock.) nil))
+  ([db-config key-name lock initial-value]
+   (redis-atom db-config key-name lock initial-value default-redis-rw))
+  ([db-config key-name lock initial-value rw]
+   (map->Duratom (merge
+                   {:lock lock
+                    :init initial-value
+                    :make-backend (partial storage/->RedisBackend
+                                           db-config
+                                           key-name
+                                           (:read rw)
+                                           (:write rw))}
+                   (select-keys rw [:commit-mode])))))
 
 (defmulti duratom
           "Top level constructor function for the <Duratom> class.
@@ -286,4 +310,8 @@
              rw default-s3-rw}}]
   (s3-atom credentials bucket key lock init rw))
 
-
+(defmethod duratom :redis-db
+  [_ & {:keys [db-config key-name init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-redis-rw}}]
+  (redis-atom db-config key-name lock init rw))

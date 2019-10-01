@@ -1,0 +1,16 @@
+version: '3.3'
+
+services:
+  postgres:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=atomDB
+      - POSTGRES_USER=dimitris
+      - POSTGRES_PASSWORD=secret
+  redis:
+    container_name: redis
+    image: redis
+    ports:
+      - "6379:6379"
