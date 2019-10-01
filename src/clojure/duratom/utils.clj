@@ -39,10 +39,12 @@
 
 (defn pr-str-fully
   "Wrapper around `pr-str` which binds
-   *print-length* & *print-length* to nil."
+   *print-length*, *print-length* & *print-meta* to nil."
   ^String [unpack-meta? & xs]
   (binding [*print-length* nil
-            *print-level* nil]
+            *print-level*  nil
+            *print-meta*   nil
+            *print-dup*    nil]
     (cond->> xs
              unpack-meta? (map iobj->edn-tag)
              true (apply pr-str))))
@@ -53,11 +55,10 @@
   (^bytes [s3-in]
    (s3-bucket-bytes 4096 s3-in))
   (^bytes [buffer-size s3-in]
-   (with-open [in (jio/input-stream s3-in)]
-     (let [bs (int buffer-size)
-           out (DirectByteArrayOutputStream. bs)] ;; allows for copy-less streaming when size is known
-       (jio/copy in out :buffer-size bs) ;; minimize number of loops required to fill the `out` buffer
-       (.toByteArray out)))))
+   (with-open [in (jio/input-stream s3-in)
+               out (DirectByteArrayOutputStream. (int buffer-size))] ;; allows for copy-less streaming when size is known
+     (jio/copy in out :buffer-size buffer-size) ;; minimize number of loops required to fill the `out` buffer
+     (.toByteArray out))))
 
 (defn read-edn-object
   "Efficiently read one data structure from a stream."

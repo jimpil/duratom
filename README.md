@@ -126,10 +126,15 @@ Even though this sounds like a major breaking-change, it actually isn't! Similar
 
 If you are perfectly content with losing metadata and want to revert to the previous default behaviour, you can do so by overriding the default writer (given your backend). For example, replace `ut/write-edn-object` with `(partial ut/write-edn-object false)` as the default writer, and the newly added metadata support will be completely sidestepped (i.e. the `#duratom/iobj` tag will never be emitted).
 
+
+##EDN caveats
+As explained in [this](https://www.nitor.com/fi/uutiset-ja-blogi/pitfalls-and-bumps-clojures-extensible-data-notation-edn) article, there are some quirks in EDN when used as a serialisation format. Although perfectly valid as general concerns, I see most of them as non-issues for `duratom`. Let me explain...First of all, if your program prints to `*out*`, in a lazy-seq that you're serialising (point 1E), or if you generally you have side-effecting lazy-seqs, you've got bigger problems to worry about. It is commonly understood that you shouldn't do that. Secondly, in my (almost) 10 year Clojure exposure, I've not seen a single project that uses/relies on space-containing keywords (point 1F). In a similar vein, it is extremely rare and rather unidiomatic to put random (typically mutable) Java objects (point 1D) in atoms (or any reference type for that matter). *print-level*, *print-length*, *print-meta* and *print-dup* (point 1B) are explicitly bound to nil by `duratom` prior to printing. Finally, the clojure.edn reader supports namespaced maps (point 1A) as of Clojure 1.9, so if this isn't already considered solved, it will eventually be (as the final consumers eventually update from 1.8). In fact, `duratom` (perhaps fictitiously) specifies 1.10 as the minimum Clojure version required. That is, strictly speaking, totally inaccurate, but if users stick to it, they should be good. Which leaves us with `NaN`(point 1C) - a rather hairy issue from several standpoints, and I'm afraid I don't have an answer here either. Avoid `NaN` to the best of your ability is all I can say. It can/will come back to haunt you in some way, shape or form :(.   
+
+
 ## Requirements
 
 - Java >= 8
-- Clojure >= 1.10
+- Clojure >= 1.9
 
 ### Optional Requirements
 
@@ -137,17 +142,16 @@ If you are perfectly content with losing metadata and want to revert to the prev
 - [amazonica](https://github.com/mcohen01/amazonica)
 - [carmine](https://github.com/ptaoussanis/carmine)
 
-## Development
+## Local development/testing
 
 Tests require PostreSQL and Redis server installed on your machine.
+Another option is to use the provided Docker compose configuration in the following way:
 
-Another option is to use the provided Docker compose configuration in a following way:
-
-1. Install [Docker](https://docs.docker.com/install)
-2. Install [Docker Compose](https://docs.docker.com/compose/install/)
-3. Start all databases with command `docker-compose up`
-4. Now you can run tests freely
-5. When you are finished with the development stop the database by running `docker-compose down`
+1. Install [docker](https://docs.docker.com/install/), [docker-machine](https://docs.docker.com/machine/install-machine/), [docker-compose](https://docs.docker.com/compose/install/), and finally VirtualBox.
+2. Create a docker-machine with command `docker-machine create default` (one-off step).
+3. Start all databases with command `docker-compose up`.
+4. Now you can run tests freely.
+5. When you are done with the development/testing, stop the databases by running `docker-compose down` (or simply `Ctrl-c` once).
 
 ## License
 

@@ -157,7 +157,7 @@
   [^Duratom dura]
   (let [storage (.-storage_backend dura)
         release (.-release dura)
-        lock    (.-lock dura)]
+        ^Lock lock (.-lock dura)]
     (ut/with-locking lock
       (storage/cleanup storage)
       (release true))))

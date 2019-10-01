@@ -1,6 +1,6 @@
 {:paths ["src/clojure"
          "target/classes"] ;; for dbaos.DirectByteArrayOutputStream
- :deps {org.clojure/clojure {:mvn/version "1.9.0"}}
+ :deps {org.clojure/clojure {:mvn/version "1.10.1"}}
  :aliases {:test {:main-opts ["-m" "cognitect.test-runner"]
                   :extra-paths ["test"]
                   :extra-deps {com.cognitect/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
