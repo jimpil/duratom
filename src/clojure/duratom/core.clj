@@ -139,17 +139,18 @@
 (defn- add-sync-error-handler
   [backend handle-error]
   (letfn [(backend* []
-            (delay (with-meta backend
-                       {:error-handler
-                        (if (nil? handle-error)
-                          ut/noop
-                          (fn [e]
-                            (try (handle-error e recommit*)
-                                 ;; swallow error-handler exceptions
-                                 ;; much like an agent would
-                                 (catch Exception _
-                                   ;(println "swallowed" _)
-                                   nil))))})))
+            (delay
+              (with-meta backend
+                         {:error-handler
+                          (if (nil? handle-error)
+                            ut/noop
+                            (fn [e]
+                              (try (handle-error e recommit*)
+                                   ;; swallow error-handler exceptions
+                                   ;; much like an agent would
+                                   (catch Exception _
+                                     ;(println "swallowed" _)
+                                     nil))))})))
           (recommit* [] ((recommit-fn @(backend*))))]
     @(backend*)))
 
