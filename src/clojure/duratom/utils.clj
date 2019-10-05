@@ -147,6 +147,8 @@
     (x)
     (force x))) ;; `force` returns x if not a delay
 
+(def noop (constantly nil))
+
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!
   "Updates columns or inserts a new row in the specified table."

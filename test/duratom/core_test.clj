@@ -2,7 +2,6 @@
   (:require [clojure.test :refer :all]
             [duratom.core :refer :all]
             [duratom.utils :as ut]
-            [clojure.java.io :as jio]
             [taoensso.nippy :as nippy]
             [clojure.java.io :as io])
   (:import (duratom.core Duratom)))
@@ -76,7 +75,7 @@
 (defn- file-backed-tests*
   [async?]
   (let [rel-path "data_temp.txt"
-        _ (when (.exists (jio/file rel-path))
+        _ (when (.exists (io/file rel-path))
             (io/delete-file rel-path)) ;; proper cleanup before testing
         init {:x 1 :y 2}
         dura (add-watch
@@ -90,7 +89,7 @@
                                "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty file first
-    (common* dura #(.exists (jio/file rel-path)) async?)
+    (common* dura #(.exists (io/file rel-path)) async?)
     ;; with-contents thereafter
     (spit rel-path (pr-str init))
     (common* (add-watch
@@ -102,7 +101,7 @@
                :log (fn [k r old-state new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
-             #(.exists (jio/file rel-path))
+             #(.exists (io/file rel-path))
              async?)
     )
   )
@@ -206,7 +205,7 @@
 
   (testing "File-backed atom containing `nippy` bytes..."
     (let [rel-path "data_temp.txt"
-          _ (when (.exists (jio/file rel-path))
+          _ (when (.exists (io/file rel-path))
               (io/delete-file rel-path)) ;; proper cleanup before testing
           init {:x 1 :y 2}
           dura (add-watch
@@ -219,7 +218,7 @@
                         (println "Transitioning from" old-state "to" new-state "...")))]
 
       ;; empty file first
-      (common* dura #(.exists (jio/file rel-path)) true)
+      (common* dura #(.exists (io/file rel-path)) true)
       ;; with-contents thereafter
       (nippy/freeze-to-file rel-path init)
       (common* (add-watch
@@ -229,7 +228,7 @@
                                :write nippy/freeze-to-file})
                  :log (fn [k r old-state new-state]
                         (println "Transitioning from" old-state "to" new-state "...")))
-               #(.exists (jio/file rel-path))
+               #(.exists (io/file rel-path))
                true)
       )
     )

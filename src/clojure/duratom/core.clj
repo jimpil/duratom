@@ -6,7 +6,7 @@
             [duratom.utils :as ut])
   (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
            (java.util.concurrent.locks ReentrantLock Lock)
-           (java.io Writer)))
+           (java.io Writer Closeable)))
 
 ;; ================================================================
 
@@ -105,6 +105,11 @@
   IMeta
   (meta [_]
     _meta)
+  Closeable
+  (close [_]
+    (ut/with-locking lock
+      (storage/cleanup storage-backend)
+      (release true)))
   )
 
 ;; provide a `print-method` that resembles Clojure atoms
@@ -126,46 +131,88 @@
   (or (= cmode DEFAULT_COMMIT_MODE)
       (nil? cmode)))
 
+(defn- recommit-fn
+  [backend]
+  (fn recommit []
+    (storage/commit backend)))
+
+(defn- add-sync-error-handler
+  [backend handle-error]
+  (letfn [(backend* []
+            (delay (with-meta backend
+                       {:error-handler
+                        (if (nil? handle-error)
+                          ut/noop
+                          (fn [e]
+                            (try (handle-error e recommit*)
+                                 ;; swallow error-handler exceptions
+                                 ;; much like an agent would
+                                 (catch Exception _
+                                   ;(println "swallowed" _)
+                                   nil))))})))
+          (recommit* [] ((recommit-fn @(backend*))))]
+    @(backend*)))
+
+(defn- add-async-error-handler
+  [backend handle-error]
+  (set-error-handler!
+    (:committer backend) ;; the agent
+    (if (nil? handle-error)
+      ut/noop
+      (let [recommit* (recommit-fn
+                        ;; force synchronous retry (so it's safe)
+                        (with-meta backend
+                                   {:error-handler
+                                    ;; let this bubble up so that the
+                                    ;; error handler swallows or deals with it
+                                    (fn [e] (throw e))}))]
+        (fn [_ e]
+          ;; recommitting happens on the
+          ;; agent's dispatch thread synchronously (wrt the original commit)
+          (handle-error e recommit*)))))
+  backend)
+
 (defn- ->Duratom
-  [make-backend lock init commits]
-  (assert (ut/lock? lock)
-          "The <lock> provided is NOT a valid implementation of `java.util.concurrent.locks.Lock`!")
-  (let [raw-atom (atom nil)
-        backend (cond-> raw-atom
-                        (async? commits) agent
-                        true make-backend)
-        duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
-        storage-init (storage/snapshot backend)]
-    (if (some? storage-init) ;; found stuff - sync it
-      (do ;; reset the raw atom directly to avoid writing exactly what was read
-        (reset! raw-atom storage-init)
-        duratom)
-      (cond-> duratom
-              (some? init)
-              (doto (reset! (ut/->init init))))))) ;; empty storage means we start off with <initial-value>
+  ([make-backend lock init commits]
+   (->Duratom make-backend lock init commits nil))
+  ([make-backend lock init commits handle-error]
+   (assert (ut/lock? lock)
+           "The <lock> provided is NOT a valid implementation of `java.util.concurrent.locks.Lock`!")
+   (let [raw-atom (atom nil)
+         async-commits? (async? commits)
+         backend* (cond-> raw-atom
+                          async-commits? (agent :error-mode :continue)
+                          true           make-backend)
+         backend (if async-commits?
+                   ;; need to do this on a separate step
+                   (add-async-error-handler backend* handle-error)
+                   (add-sync-error-handler  backend* handle-error))
+         duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
+         storage-init (storage/snapshot backend)]
+     (if (some? storage-init) ;; found stuff - sync it
+       (do ;; reset the raw atom directly to avoid writing exactly what was read
+         (reset! raw-atom storage-init)
+         duratom)
+       (cond-> duratom
+               (some? init)
+               (doto (reset! (ut/->init init)))))))) ;; empty storage means we start off with <initial-value>
 
 (defn- map->Duratom [m]
-  (let [[make-backend lock initial-value commit-mode]
-        ((juxt :make-backend :lock :init :commit-mode) m)]
-    (->Duratom make-backend lock initial-value commit-mode)))
+  (let [{:keys [make-backend lock init commit-mode error-handler]} m]
+    (->Duratom make-backend lock init commit-mode error-handler)))
 
 
 ;;==================<PUBLIC API>==========================
 
 (defn destroy
-  "Convenience fn for cleaning up the persistent storage of a duratom."
-  [^Duratom dura]
-  (let [storage (.-storage_backend dura)
-        release (.-release dura)
-        ^Lock lock (.-lock dura)]
-    (ut/with-locking lock
-      (storage/cleanup storage)
-      (release true))))
-
+  "Convenience fn for cleaning up the persistent storage
+  of a duratom manually."
+  [^Closeable duratom]
+  (.close duratom))
 
 (defn backend-snapshot
   "Convenience fn for acquiring a snapshot of
-   the persistent storage of a duratom."
+   the persistent storage of a duratom manually."
   [^Duratom dura]
   (storage/snapshot (.-storage_backend dura)))
 
@@ -192,7 +239,7 @@
                                              (.createNewFile))
                                            (:read rw)
                                            (:write rw))}
-                   (select-keys rw [:commit-mode])))))
+                   (select-keys rw [:commit-mode :error-handler])))))
 
 
 (def default-postgres-rw
@@ -224,7 +271,7 @@
                                            row-id
                                            (:read rw)
                                            (:write rw))}
-                   (select-keys rw [:commit-mode])))))
+                   (select-keys rw [:commit-mode :error-handler])))))
 
 (def default-s3-rw
   ;; `edn/read` doesn't make use of the object size, so no reason to fetch it from S3 (we communicate that via metadata).
@@ -259,7 +306,7 @@
                                            (:metadata rw)
                                            (:read rw)
                                            (:write rw))}
-                   (select-keys rw [:commit-mode])))))
+                   (select-keys rw [:commit-mode :error-handler])))))
 
 (def default-redis-rw
   {;; Redis library Carmine automatically uses Nippy for serialization/deserialization Clojure types
@@ -284,7 +331,7 @@
                                            key-name
                                            (:read rw)
                                            (:write rw))}
-                   (select-keys rw [:commit-mode])))))
+                   (select-keys rw [:commit-mode :error-handler])))))
 
 (defmulti duratom
           "Top level constructor function for the <Duratom> class.

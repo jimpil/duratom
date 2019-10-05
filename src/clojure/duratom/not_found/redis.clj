@@ -1,4 +1,5 @@
-(ns duratom.not-found.redis)
+(ns duratom.not-found.redis
+  (:refer-clojure :exclude [get set]))
 
 (defmacro wcar [conn-opts & args]
   `(throw (UnsupportedOperationException.

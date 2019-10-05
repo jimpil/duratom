@@ -4,21 +4,33 @@
            (clojure.lang Agent Atom)))
 
 (defprotocol ICommiter
-  (commit! [this f]))
+  (commit! [this f ef]
+           [this f]))
 
 (extend-protocol ICommiter
   Agent ;; asynchronous
-  (commit! [this f]
-    (send-off this f))
+  (commit!
+    ([this f]
+     (send-off this f))
+    ([this f handle-error]
+     ;; do this synchronously!
+     (commit! (deref this) f handle-error)))
   Atom  ;; synchronous
-  (commit! [this f]
-    (f this))
+  (commit! [this f handle-error]
+    (try
+      (f this)
+      (catch Exception e
+        (handle-error e))))
   )
 
 (defprotocol IStorageBackend
   (snapshot [this])
   (commit [this])
   (cleanup [this]))
+
+(defn- get-error-handler
+  [backend]
+  (some-> (meta backend) :error-handler))
 
 ;; ===============================<LOCAL FILE>===========================================
 (defn- save-to-file!
@@ -38,8 +50,13 @@
                (throw (ex-info (str "Unable to read data from file " path "!")
                                {:file-path path}
                                e)))))))
-  (commit [_]
-    (commit! committer (partial save-to-file! write-it! (.getPath file))))
+  (commit [this]
+    ;; synchronous backends always have an error-handler in their meta
+    ;; asynchronous ones MAY have one (for synchronous re-committing)
+    (let [f (partial save-to-file! write-it! (.getPath file))]
+      (if-let [ehandler (get-error-handler this)]
+        (commit! committer f ehandler)
+        (commit! committer f))))
   (cleanup [_]
     (or (.delete file) ;; simply delete the file
         (throw (IOException. (str "Could not delete " (.getPath file))))))
@@ -55,8 +72,11 @@
   IStorageBackend
   (snapshot [_]
     (ut/get-pgsql-value config table-name row-id read-it!))
-  (commit [_]
-    (commit! committer (partial save-to-db! config table-name row-id write-it!)))
+  (commit [this]
+    (let [f (partial save-to-db! config table-name row-id write-it!)]
+      (if-let [ehandler (get-error-handler this)]
+        (commit! committer f ehandler)
+        (commit! committer f))))
   (cleanup [_]
     (ut/delete-relevant-row! config table-name row-id)) ;;drop the relevant row
   )
@@ -72,8 +92,11 @@
   IStorageBackend
   (snapshot [_]
     (ut/get-value-from-s3 credentials bucket k metadata read-it!))
-  (commit [_]
-    (commit! committer (partial save-to-s3! credentials bucket k write-it!)))
+  (commit [this]
+    (let [f (partial save-to-s3! credentials bucket k write-it!)]
+      (if-let [ehandler (get-error-handler this)]
+        (commit! committer f ehandler)
+        (commit! committer f))))
   (cleanup [_]
     (ut/delete-object-from-s3 credentials bucket k)) ;;drop the whole object
   )
@@ -84,9 +107,12 @@
   IStorageBackend
   (snapshot [_]
     (read-it! (ut/redis-get conn key-name)))
-  (commit [_]
-    (commit! committer (fn [state-atom]
-                         (ut/redis-set conn key-name (write-it! @state-atom))
-                         state-atom)))
+  (commit [this]
+    (let [f (fn [state-atom]
+              (ut/redis-set conn key-name (write-it! @state-atom))
+              state-atom)]
+      (if-let [ehandler (get-error-handler this)]
+        (commit! committer f ehandler)
+        (commit! committer f))))
   (cleanup [_]
     (ut/redis-del conn key-name)))

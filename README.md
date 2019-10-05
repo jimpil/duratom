@@ -107,6 +107,10 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
               :write identity})
 ```
 
+## Custom error-handling
+
+`duratom` 0.4.7 adds support for user-defined error handling (when persisting a value fails), applicable to both synchronous and asynchronous commits (see next section) The `:rw` map, can now take an `:error-handler` key, pointing to a function of 2 arguments - the exception object thrown, and a no-arg fn which when called will retry the commit call (which is safe to do btw). You can use this facility to (at least) log the error thrown - whether (or not) it's worth retrying depends entirely on the application (e.g. how critical it is for a particular commit to succeed). Moreover, it's worth noting that exceptions thrown from within the error-handler will be swallowed. This is natural behaviour for an agent (which is relied on for async commits), and is mimicked in the synchronous scenario too.  If `:error-handler` is not provided, defaults to `(constantly nil)`. 
+
 ## Asynchronous commits (by default)
 In `duratom` persisting to storage happens asynchronously (via an `agent`). This ensures minimum overhead  (duratoms feel like regular atoms regardless of the storage backend), but more importantly safety (writes never collide). However, this also means that if you *manually* take a peek at storage without allowing sufficient time for the writes, you might momentarily see inconsistent values between the duratom and its storage. That is not a problem though, it just means that the state of the duratom won't necessarily be the same as the persisted state at *all* times. For instance, this is precisely why you will find some `Thread/sleep` expressions in the `core_test.clj` namespace. 
 
