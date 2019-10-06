@@ -138,6 +138,7 @@
 
 (defn- add-sync-error-handler
   [backend handle-error]
+  ;; have to do this dance here (i.e. mutual recursion)
   (letfn [(backend* []
             (delay
               (with-meta backend
@@ -169,7 +170,7 @@
                                     (fn [e] (throw e))}))]
         (fn [_ e]
           ;; recommitting happens on the
-          ;; agent's dispatch thread synchronously (wrt the original commit)
+          ;; agent's dispatch thread *synchronously* (wrt the original commit)
           (handle-error e recommit*)))))
   backend)
 
