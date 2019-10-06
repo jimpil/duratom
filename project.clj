@@ -1,4 +1,4 @@
-(defproject duratom "0.4.8-SNAPSHOT"
+(defproject duratom "0.4.9-SNAPSHOT"
   :description "A durable atom type for Clojure."
   :url "https://github.com/jimpil/duratom"
   :license {:name "Eclipse Public License"
@@ -11,7 +11,7 @@
                                   [com.taoensso/nippy "2.13.0"]]}}
   :source-paths ["src/clojure"]
   :java-source-paths ["src/java"]
-  :javac-options ["-target" "1.8" "-source" "1.8"]
+  :javac-options ["--release" "8"]
   :lein-release {:deploy-via :clojars}
   ;:java-cmd "/usr/lib/jvm/java-8-oracle"
   )

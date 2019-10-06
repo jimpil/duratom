@@ -138,22 +138,19 @@
 
 (defn- add-sync-error-handler
   [backend handle-error]
-  ;; have to do this dance here (i.e. mutual recursion)
-  (letfn [(backend* []
-            (delay
-              (with-meta backend
-                         {:error-handler
-                          (if (nil? handle-error)
-                            ut/noop
-                            (fn [e]
-                              (try (handle-error e recommit*)
-                                   ;; swallow error-handler exceptions
-                                   ;; much like an agent would
-                                   (catch Exception _
-                                     ;(println "swallowed" _)
-                                     nil))))})))
-          (recommit* [] ((recommit-fn @(backend*))))]
-    @(backend*)))
+  (let [p (promise)]
+    @(deliver p
+             (with-meta backend
+                        {:error-handler
+                         (if (nil? handle-error)
+                           ut/noop
+                           (fn [e]
+                             (try (handle-error e (recommit-fn @p))
+                                  ;; swallow error-handler exceptions
+                                  ;; much like an agent would
+                                  (catch Exception _
+                                    ;(println "swallowed" _)
+                                    nil))))}))))
 
 (defn- add-async-error-handler
   [backend handle-error]
