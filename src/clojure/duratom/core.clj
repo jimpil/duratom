@@ -4,21 +4,13 @@
             [clojure.java.io :as jio]
             [duratom.readers :as readers]
             [duratom.utils :as ut])
-  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2 Agent)
+  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2 Agent IReference)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer Closeable)))
-
-(defn- safe-cleanup!
-  [storage release lock]
-  (when-not (release)
-    (ut/with-locking lock
-      (storage/cleanup storage)
-      (release true))))
-
 ;; ================================================================
 
 (deftype Duratom
-  [storage-backend ^Atom underlying-atom ^Lock lock release _meta]
+  [storage-backend ^Atom underlying-atom ^Lock lock release]
 
   IAtom2 ;; the new interface introduced in 1.9
   (swapVals [_ f]
@@ -90,7 +82,7 @@
       (let [result (.reset underlying-atom newval)]
         (storage/commit storage-backend result)
         result)))
-  IRef
+  IRef ;; watches/validators/meta/deref works against the underlying atom
   (setValidator [_ validator]
     (.setValidator underlying-atom validator))
   (getValidator [_]
@@ -108,13 +100,18 @@
     (.deref underlying-atom))
   IObj
   (withMeta [_ meta-map]
-    (Duratom. storage-backend underlying-atom ^Lock lock release meta-map))
+    (Duratom. storage-backend (with-meta underlying-atom meta-map) ^Lock lock release))
   IMeta
   (meta [_]
-    _meta)
+    (meta underlying-atom))
+  IReference
+  (resetMeta [_ meta-map]
+    (.resetMeta underlying-atom meta-map))
+  (alterMeta [_ f args]
+    (.alterMeta underlying-atom f args))
   Closeable
   (close [_]
-    (safe-cleanup! storage-backend release lock))
+    (storage/safe-cleanup! storage-backend release lock))
   )
 
 ;; provide a `print-method` that resembles Clojure atoms
@@ -196,7 +193,7 @@
                    ;; need to do this on a separate step
                    (add-agent-error-handler backend* handle-error)
                    (add-atom-error-handler backend* handle-error))
-         duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
+         duratom (Duratom. backend raw-atom lock (ut/releaser))
          storage-init (storage/snapshot backend)]
      (if (some? storage-init) ;; found stuff - sync it
        (do ;; reset the raw atom directly to avoid writing exactly what was read
@@ -398,7 +395,7 @@
                                (ex-info (str "Commit error: " e)
                                         {:type ::storage/commit-error}
                                         e)))))))
-      (reset-meta! {::storage/destroy (partial safe-cleanup! backend release cleanup-lock)})
+      (reset-meta! {::storage/destroy (partial storage/safe-cleanup! backend release cleanup-lock)})
       (set-error-handler!
         (if (nil? ehandler)
           ut/noop

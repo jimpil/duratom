@@ -37,6 +37,13 @@
             [this x])
   (cleanup  [this]))
 
+(defn safe-cleanup!
+  [storage release lock]
+  (when-not (release)
+    (ut/with-locking lock
+      (cleanup storage)
+      (release true))))
+
 (defn- get-error-handler
   [backend]
   (some-> (meta backend) :error-handler))
