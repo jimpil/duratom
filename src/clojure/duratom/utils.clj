@@ -131,7 +131,7 @@
 (defmacro assert-not-released!
   [release-fn]
   `(when (~release-fn)
-     (throw (IllegalStateException. "Duratom has been released!"))))
+     (throw (IllegalStateException. "duratom/duragent has been released!"))))
 
 (defn- md5sum
   "Calculates the MD5 checksum for given bytes <xs>,

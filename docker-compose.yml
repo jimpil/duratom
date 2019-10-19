@@ -1,7 +1,9 @@
 version: '3.3'
 
 services:
-  postgres:
+  postgres_DB:
+    restart: always
+    container_name: postgres
     image: postgres
     ports:
       - "5432:5432"
@@ -9,7 +11,8 @@ services:
       - POSTGRES_DB=atomDB
       - POSTGRES_USER=dimitris
       - POSTGRES_PASSWORD=secret
-  redis:
+  redis_DB:
+    restart: always
     container_name: redis
     image: redis
     ports:

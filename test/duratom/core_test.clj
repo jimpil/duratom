@@ -118,7 +118,7 @@
   [async?]
   (let [db-spec {:classname   "org.postgresql.Driver"
                  :subprotocol "postgresql"
-                 :subname     "//localhost:5432/atomDB"
+                 :subname     "//postgres_DB:5432/atomDB"
                  :user        "dimitris"
                  :password    "secret"}
         table-name "atom_state"
@@ -168,7 +168,7 @@
 
 (defn- redis-backed-tests*
   [async?]
-  (let [db-config  {:pool {} :spec {:uri "redis://localhost/"}}
+  (let [db-config  {:pool {} :spec {:uri "redis://redis_DB:6379"}}
         key-name "atom:state"
         init {:x 1 :y 2}
         key-exists? #(ut/redis-key-exists? db-config key-name)

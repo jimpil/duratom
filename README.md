@@ -9,8 +9,9 @@
 
 ## What
 
-A durable atom type for Clojure. Duratom implements the same interfaces as the core Clojure atom (IAtom, IRef, IDeref).
-In order to provide durability `duratom` will persist its state to some durable-backend on each mutation. The built-in backends are:
+A durable atom/agent type for Clojure. `duratom` implements the same interfaces as the core Clojure atom (IAtom, IRef, IDeref), 
+whereas `duragent` **is** a Clojure agent (with a special watch + some metadata). 
+In order to provide durability `duratom`/`duragent` will persist its state to some durable-backend on each mutation. The built-in backends are:
 
  1. A file on the local file-system
  2. A postgres DB table row
@@ -30,7 +31,10 @@ Main difference between `duratom` & `durable-atom` is that a `durable-atom` atom
 
 ## Usage
 
-The public API consists of a single constructor function (`duratom.core/duratom`). Once you have constructed a duratom object, you can use it just like a regular atom, with the slight addition that when you're done with it, you can call `duratom.core/destroy` on it to clear the durable backend (e.g. delete the file/table).
+The public API consists of two constructor function (`duratom.core/duratom` and `duratom.core/duragent`). The same parameters
+are applicable to both apart from `:commit-mode`, which is a no-op for `duragent`. 
+Once you have constructed a duratom object, you can use it just like a regular atom, with the slight addition that when 
+you're done with it, you can call `duratom.core/destroy` on it to clear the durable backend (e.g. delete the file/table).
 
 Subsequent mutating operations are prohibited (only `deref`ing will work).
 
@@ -107,15 +111,24 @@ By default duratom stores plain EDN data (via `pr-str`). If that's good enough f
               :write identity})
 ```
 
-## Custom error-handling
-
-`duratom` 0.4.7 adds support for user-defined error handling (when persisting a value fails), applicable to both synchronous and asynchronous commits (see next section) The `:rw` map, can now take an `:error-handler` key, pointing to a function of 2 arguments - the exception object thrown, and a no-arg fn which when called will retry the commit call (which is safe to do btw). You can use this facility to (at least) log the error thrown - whether (or not) it's worth retrying depends entirely on the application (e.g. how critical it is for a particular commit to succeed). Moreover, it's worth noting that exceptions thrown from within the error-handler will be swallowed. This is natural behaviour for an agent (which is relied on for async commits), and is mimicked in the synchronous scenario too.  If `:error-handler` is not provided, defaults to `(constantly nil)`. 
-
 ## Asynchronous commits (by default)
 In `duratom` persisting to storage happens asynchronously (via an `agent`). This ensures minimum overhead  (duratoms feel like regular atoms regardless of the storage backend), but more importantly safety (writes never collide). However, this also means that if you *manually* take a peek at storage without allowing sufficient time for the writes, you might momentarily see inconsistent values between the duratom and its storage. That is not a problem though, it just means that the state of the duratom won't necessarily be the same as the persisted state at *all* times. For instance, this is precisely why you will find some `Thread/sleep` expressions in the `core_test.clj` namespace. 
 
 If you're not comfortable with the above, or if for whatever reason you prefer synchronous commits, `duratom 0.4.3` adds support for them. You just need to provide some value as the `:commit-mode` in your `rw` map. That value can be anything but nil, nor `:duratom.core/async` (I use `:sync` in the unit-tests) as these two are reserved for async commits. Consequently, existing users that were relying on custom readers/writers are not affected.  
    
+
+## Custom error-handling 
+
+In order to fully understand error-handling, the distinction between a regular commit VS a re-commit, must be crystal clear. The former is attempted once by the construct itself (`duratom`/`duragent`), whereas the latter is (potentially) caller initiated (see below), and even possibly more than once. Whether or not it is safe to re-commit depends on the actual construct, and hopefully the caveats of certain situations should become apparent by the end of this section. 
+
+`duratom` 0.4.7 adds support for user-defined error handling (when persisting a value fails), applicable to both synchronous and asynchronous commits (see previous section) The `:rw` map, can now take an `:error-handler` key, which for the duratom case should be pointing to a function of 2 arguments - the exception object thrown, and a no-arg fn which when called will retry the commit call (recommit). For the duragent case that fn should have two arities - the usual `[agent exception]` arity which will handle errors unrelated to persistence, and `[agent exception recommit-fn]` which will handle all the persistence errors. You can use this facility to (at least) log the error thrown - whether (or not) it's worth recommitting depends entirely on the application (e.g. how critical it is for a particular commit to succeed). Moreover, it's worth noting that exceptions thrown from within the error-handler will be swallowed. This is natural behaviour for an agent (which is relied on for async commits), and is mimicked in the synchronous scenario too.  If `:error-handler` is not provided, defaults to `(constantly nil)`. 
+
+### Recommitting
+
+As established in the previous section, by default a `duratom` will dispatch commits of the new state (of the underlying atom) via an internal agent. This setup gains async commit semantics, but doesn't play nicely with re-committing in the provided error-handler (per the previous paragraph), simply because the atom's state might have changed by the time the recommit fires. A synchronous `duratom` doesn't suffer from this symptom, as the entire commit call stays behind a lock (as opposed to `send-off` which escapes the scope of the lock). Neither does a `duragent`, because the recommit will happen on the agent's dispatch thread before any pending sends (i.e. synchronously wrt to the original commit).
+
+####TL:DR 
+If you use `duratom`, and you also want to be able to safely recommit from within the error-handler, consider using it in synchronous commit-mode, or switch to `duragent`.
 
 
 ## Default EDN readers

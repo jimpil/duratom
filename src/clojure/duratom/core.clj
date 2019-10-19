@@ -4,9 +4,16 @@
             [clojure.java.io :as jio]
             [duratom.readers :as readers]
             [duratom.utils :as ut])
-  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2)
+  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2 Agent)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer Closeable)))
+
+(defn- safe-cleanup!
+  [storage release lock]
+  (when-not (release)
+    (ut/with-locking lock
+      (storage/cleanup storage)
+      (release true))))
 
 ;; ================================================================
 
@@ -17,32 +24,32 @@
   (swapVals [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f)]
-        (storage/commit storage-backend)
+      (let [[_ n :as result] (.swapVals underlying-atom f)]
+        (storage/commit storage-backend n)
         result)))
   (swapVals [_ f arg1]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f arg1)]
-        (storage/commit storage-backend)
+      (let [[_ n :as result] (.swapVals underlying-atom f arg1)]
+        (storage/commit storage-backend n)
         result)))
   (swapVals [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f arg1 arg2)]
-        (storage/commit storage-backend)
+      (let [[_ n :as result] (.swapVals underlying-atom f arg1 arg2)]
+        (storage/commit storage-backend n)
         result)))
   (swapVals [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swapVals underlying-atom f arg1 arg2 more)]
-        (storage/commit storage-backend)
+      (let [[_ n :as result] (.swapVals underlying-atom f arg1 arg2 more)]
+        (storage/commit storage-backend n)
         result)))
   (resetVals [_ newvals]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.resetVals underlying-atom newvals)]
-        (storage/commit storage-backend)
+      (let [[_ n :as result] (.resetVals underlying-atom newvals)]
+        (storage/commit storage-backend n)
         result)))
 
   IAtom
@@ -50,38 +57,38 @@
     (ut/assert-not-released! release)
     (ut/with-locking lock
       (let [result (.swap underlying-atom f)]
-        (storage/commit storage-backend)
+        (storage/commit storage-backend result)
         result)))
   (swap [_ f arg]
     (ut/assert-not-released! release)
     (ut/with-locking lock
       (let [result (.swap underlying-atom f arg)]
-        (storage/commit storage-backend)
+        (storage/commit storage-backend result)
         result)))
   (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
       (let [result (.swap underlying-atom f arg1 arg2)]
-        (storage/commit storage-backend)
+        (storage/commit storage-backend result)
         result)))
   (swap [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
       (let [result (.swap underlying-atom f arg1 arg2 more)]
-        (storage/commit storage-backend)
+        (storage/commit storage-backend result)
         result)))
   (compareAndSet [_ oldv newv]
     (ut/assert-not-released! release)
     (ut/with-locking lock
       (let [result (.compareAndSet underlying-atom oldv newv)]
         (when result
-          (storage/commit storage-backend))
+          (storage/commit storage-backend result))
         result)))
   (reset [_ newval]
     (ut/assert-not-released! release)
     (ut/with-locking lock
       (let [result (.reset underlying-atom newval)]
-        (storage/commit storage-backend)
+        (storage/commit storage-backend result)
         result)))
   IRef
   (setValidator [_ validator]
@@ -107,9 +114,7 @@
     _meta)
   Closeable
   (close [_]
-    (ut/with-locking lock
-      (storage/cleanup storage-backend)
-      (release true)))
+    (safe-cleanup! storage-backend release lock))
   )
 
 ;; provide a `print-method` that resembles Clojure atoms
@@ -133,37 +138,42 @@
 
 (defn- recommit-fn
   [backend]
-  (fn recommit []
+  (fn recommit* []
+    ;; recommitting has to access (deref) the state
+    ;; but that's ok because we're either within a lock,
+    ;; or
     (storage/commit backend)))
 
-(defn- add-sync-error-handler
+(defn- add-atom-error-handler
   [backend handle-error]
-  (let [p (promise)]
+  (let [p (promise)
+        rcmt (delay (recommit-fn @p))]
     @(deliver p
              (with-meta backend
                         {:error-handler
                          (if (nil? handle-error)
                            ut/noop
                            (fn [e]
-                             (try (handle-error e (recommit-fn @p))
+                             (try (handle-error e @rcmt)
                                   ;; swallow error-handler exceptions
                                   ;; much like an agent would
                                   (catch Exception _
                                     ;(println "swallowed" _)
                                     nil))))}))))
 
-(defn- add-async-error-handler
+(defn- add-agent-error-handler
   [backend handle-error]
   (set-error-handler!
     (:committer backend) ;; the agent
     (if (nil? handle-error)
       ut/noop
       (let [recommit* (recommit-fn
-                        ;; force synchronous retry (so it's safe)
+                        ;; force synchronous recommit (so it's as safe as possible)
                         (with-meta backend
                                    {:error-handler
                                     ;; let this bubble up so that the
-                                    ;; error handler swallows or deals with it
+                                    ;; user error-handler deals with it
+                                    ;; or the agent eventually swallows it
                                     (fn [e] (throw e))}))]
         (fn [_ e]
           ;; recommitting happens on the
@@ -184,8 +194,8 @@
                           true           make-backend)
          backend (if async-commits?
                    ;; need to do this on a separate step
-                   (add-async-error-handler backend* handle-error)
-                   (add-sync-error-handler  backend* handle-error))
+                   (add-agent-error-handler backend* handle-error)
+                   (add-atom-error-handler backend* handle-error))
          duratom (Duratom. backend raw-atom lock (ut/releaser) nil)
          storage-init (storage/snapshot backend)]
      (if (some? storage-init) ;; found stuff - sync it
@@ -206,8 +216,11 @@
 (defn destroy
   "Convenience fn for cleaning up the persistent storage
   of a duratom manually."
-  [^Closeable duratom]
-  (.close duratom))
+  [dura] ;; duratom or duragent
+  (condp instance? dura
+    Duratom (.close ^Closeable dura) ;; duratom implements Closeable
+    Agent   (when-let [cleanup! (some-> dura meta ::storage/destroy)]
+              (cleanup!))))          ;; duragent doesn't
 
 (defn backend-snapshot
   "Convenience fn for acquiring a snapshot of
@@ -334,7 +347,7 @@
 
 (defmulti duratom
           "Top level constructor function for the <Duratom> class.
-   Built-in <backed-by> types are `:local-file`, `:postgres-db` & `:aws-s3`."
+   Built-in <backed-by> types are `:local-file`, `:postgres-db`, `:redis-db` & `:aws-s3`."
           (fn [backed-by & _args]
             backed-by))
 
@@ -361,3 +374,93 @@
         :or {lock (ReentrantLock.)
              rw default-redis-rw}}]
   (redis-atom db-config key-name lock init rw))
+;;=========================================================
+;;=======================DURAGENT==========================
+
+(defn- duragent*
+  "Common constructor for duragents"
+  [init ehandler make-backend]
+  (let [ag (agent init :error-mode :continue)
+        backend (with-meta (make-backend ag)
+                           ;; force synchronous recommits
+                           {:error-handler (fn [e] (throw e))})
+        cleanup-lock (ReentrantLock.)
+        release (ut/releaser)]
+    (doto (add-watch ag
+                     ::storage/commit
+                     (fn [_ _ o n]
+                       (when (not= o n)
+                         (ut/assert-not-released! release)
+                         (try
+                           (storage/commit backend n)
+                           (catch Exception e
+                             (throw
+                               (ex-info (str "Commit error: " e)
+                                        {:type ::storage/commit-error}
+                                        e)))))))
+      (reset-meta! {::storage/destroy (partial safe-cleanup! backend release cleanup-lock)})
+      (set-error-handler!
+        (if (nil? ehandler)
+          ut/noop
+          (fn [a e]
+            (if (= ::storage/commit-error (some-> (ex-data e) :type))
+              (let [x @a]
+                (ehandler a (ex-cause e) #(storage/commit backend x)))
+              (ehandler a e))))))))
+
+(defmulti duragent
+          "duragent is to agent, what duratom is to atom"
+          (fn [backed-by & _args]
+            backed-by))
+
+(defmethod duragent :local-file
+  [_ & {:keys [file-path init rw]
+        :or {rw default-file-rw}}]
+  (let [make-backend (partial storage/->FileBackend
+                              (doto (jio/file file-path)
+                                (.createNewFile))
+                              (:read rw)
+                              (:write rw))]
+    (duragent* init (:error-handler rw) make-backend)))
+
+(defmethod duragent :postgres-db
+  [_ & {:keys [db-config table-name row-id init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-postgres-rw}}]
+  (let [make-backend (partial storage/->PGSQLBackend
+                              db-config
+                              (if (ut/table-exists? db-config table-name)
+                                table-name
+                                (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
+                                    table-name))
+                              row-id
+                              (:read rw)
+                              (:write rw))]
+    (duragent* init (:error-handler rw) make-backend)))
+
+(defmethod duragent :aws-s3
+  [_ & {:keys [credentials bucket key init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-s3-rw}}]
+  (let [make-backend (partial storage/->S3Backend
+                              credentials
+                              (if (ut/bucket-exists? credentials bucket)
+                                bucket
+                                (do (ut/create-s3-bucket credentials bucket)
+                                    bucket))
+                              key
+                              (:metadata rw)
+                              (:read rw)
+                              (:write rw))]
+    (duragent* init (:error-handler rw) make-backend)))
+
+(defmethod duragent :redis-db
+  [_ & {:keys [db-config key-name init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-redis-rw}}]
+  (let [make-backend (partial storage/->RedisBackend
+                              db-config
+                              key-name
+                              (:read rw)
+                              (:write rw))]
+    (duragent* init (:error-handler rw) make-backend)))
