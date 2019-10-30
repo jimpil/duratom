@@ -9,9 +9,9 @@
                                   [amazonica "0.3.58"]
                                   [com.taoensso/carmine "2.19.1"]
                                   [com.taoensso/nippy "2.13.0"]]}}
-  :source-paths ["src/clojure"]
+  :source-paths      ["src/clojure"]
   :java-source-paths ["src/java"]
-  :javac-options ["--release" "8"]
-  :lein-release {:deploy-via :clojars}
-  ;:java-cmd "/usr/lib/jvm/java-8-oracle"
+  :javac-options     ["--release" "8"]
+  :deploy-repositories [["releases" :clojars]] ;; lein release :patch
+  :signing {:gpg-key "jimpil1985@gmail.com"}
   )

@@ -212,18 +212,21 @@
 
 (defn destroy
   "Convenience fn for cleaning up the persistent storage
-  of a duratom manually."
-  [dura] ;; duratom or duragent
+  of a duratom/duragent manually."
+  [dura]
   (condp instance? dura
     Duratom (.close ^Closeable dura) ;; duratom implements Closeable
-    Agent   (when-let [cleanup! (some-> dura meta ::storage/destroy)]
+    Agent   (when-let [cleanup! (some-> (meta dura) ::storage/destroy)]
               (cleanup!))))          ;; duragent doesn't
 
 (defn backend-snapshot
   "Convenience fn for acquiring a snapshot of
-   the persistent storage of a duratom manually."
-  [^Duratom dura]
-  (storage/snapshot (.-storage_backend dura)))
+   the persistent storage of a duratom/duragent manually."
+  [dura]
+  (condp instance? dura
+    Duratom (storage/snapshot (.-storage_backend dura))
+    Agent (when-let [snap (some-> (meta dura) ::storage/snapshot)]
+            (snap))))
 
 
 (def default-file-rw
@@ -395,14 +398,14 @@
                                (ex-info (str "Commit error: " e)
                                         {:type ::storage/commit-error}
                                         e)))))))
-      (reset-meta! {::storage/destroy (partial storage/safe-cleanup! backend release cleanup-lock)})
+      (reset-meta! {::storage/destroy (partial storage/safe-cleanup! backend release cleanup-lock)
+                    ::storage/snapshot #(storage/snapshot backend)})
       (set-error-handler!
         (if (nil? ehandler)
           ut/noop
           (fn [a e]
             (if (= ::storage/commit-error (some-> (ex-data e) :type))
-              (let [x @a]
-                (ehandler a (ex-cause e) #(storage/commit backend x)))
+              (ehandler a (ex-cause e) #(storage/commit backend @a))
               (ehandler a e))))))))
 
 (defmulti duragent

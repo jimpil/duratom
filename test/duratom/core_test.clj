@@ -4,14 +4,18 @@
             [duratom.utils :as ut]
             [taoensso.nippy :as nippy]
             [clojure.java.io :as io])
-  (:import (duratom.core Duratom)))
+  (:import (duratom.core Duratom)
+           (clojure.lang Agent)))
 
 (defn- common*
-  [^Duratom dura exists? async?]
-  (let [sleep-time 200]
+  [dura exists? async?]
+  (let [sleep-time 200
+        f (if (instance? Agent dura)
+            send 
+            swap!)]
     (-> dura ;; init = {:x 1 :y 2}
-        (doto (swap! assoc :z 3))
-        (doto (swap! dissoc :x)))
+        (doto (f assoc :z 3))
+        (doto (f dissoc :x)))
 
     (when async?
       (Thread/sleep sleep-time))
@@ -20,8 +24,8 @@
     (is (= (backend-snapshot dura) @dura))
 
     (-> dura
-        (doto (reset! [1 2 3]))
-        (doto (swap!  (comp vec rest))))
+        (doto (f  (constantly [1 2 3])))
+        (doto (f  (comp vec rest))))
 
     (when async?
       (Thread/sleep sleep-time))
@@ -41,7 +45,7 @@
     (is (= [[1 2 3] [2 3]]
            (swap-vals! dura rest)))
 
-    (swap! dura (partial into (sorted-set)))
+    (f dura (partial into (sorted-set)))
 
     (when async?
       (Thread/sleep sleep-time))
@@ -49,7 +53,7 @@
     (is (sorted? @dura))
     (is (= (sorted-set 2 3) (backend-snapshot dura) @dura))
 
-    (swap! dura #(with-meta % {:a 1 :b 2}))
+    (f dura #(with-meta % {:a 1 :b 2}))
 
     (when async?
       (Thread/sleep sleep-time))
@@ -67,7 +71,7 @@
 
     (is (sorted? @dura))
     (is (= #{2 3} @dura))
-    (is (thrown? IllegalStateException (swap! dura conj 4)))
+    (is (thrown? IllegalStateException (f dura conj 4)))
     (is (false? (exists?)) "Storage resource was NOT cleaned-up!!!")
     )
   )
@@ -78,7 +82,7 @@
         _ (when (.exists (io/file rel-path))
             (io/delete-file rel-path)) ;; proper cleanup before testing
         init {:x 1 :y 2}
-        dura (add-watch
+        duratm (add-watch
                (duratom :local-file
                         :file-path rel-path
                         :init init
@@ -89,7 +93,7 @@
                                "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty file first
-    (common* dura #(.exists (io/file rel-path)) async?)
+    (common* duratm #(.exists (io/file rel-path)) async?)
     ;; with-contents thereafter
     (spit rel-path (pr-str init))
     (common* (add-watch
@@ -103,12 +107,21 @@
                                "to" (ut/pr-str-fully true new-state) "...")))
              #(.exists (io/file rel-path))
              async?)
+
+    ;; duragent version
+    (when async?
+      (common* (duragent :local-file
+                         :file-path rel-path
+                         :init init
+                         :rw default-file-rw)
+               #(.exists (io/file rel-path))
+               true))
     )
   )
 
 
 (deftest file-backed-tests
-  (println "File-backed atom with async commit...")
+  (println "File-backed atom/agent with async commit...")
   (file-backed-tests* true)
   (println "File-backed atom with sync commit...")
   (file-backed-tests* false)
@@ -155,12 +168,23 @@
                                "to" (ut/pr-str-fully true new-state) "...")))
              #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
              async?)
+
+    ;; duragent version
+    (when async?
+      (common* (duragent :postgres-db
+                         :db-config db-spec
+                         :table-name table-name
+                         :row-id 0
+                         :init init
+                         :rw default-postgres-rw)
+               #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
+               true))
     )
   )
 
 
 (deftest postgres-backed-tests
-  (println "PGSQL-backed atom with async commit...")
+  (println "PGSQL-backed atom/agent with async commit...")
   (postgres-backed-tests* true)
   (println "PGSQL-backed atom with sync commit...")
   (postgres-backed-tests* false)
@@ -180,9 +204,7 @@
                       :rw (cond-> default-redis-rw
                             (not async?) (assoc :commit-mode :sync)))]
     ;; empty key first
-    (common* dura
-             key-exists?
-             async?)
+    (common* dura key-exists? async?)
     ;; with contents
     (ut/redis-set db-config key-name (pr-str init))
     (common* (duratom :redis-db
@@ -192,7 +214,19 @@
                       :rw (cond-> default-redis-rw
                             (not async?) (assoc :commit-mode :sync)))
              key-exists?
-             async?)))
+             async?)
+
+    ;; duragent version
+    (when async?
+      (common* (duragent :redis-db
+                         :db-config db-config
+                         :key-name key-name
+                         :init init
+                         :rw default-redis-rw)
+               key-exists?
+               true))
+
+    ))
 
 (deftest redis-backed-tests
   (println "Redis-backed atom with async commit...")
