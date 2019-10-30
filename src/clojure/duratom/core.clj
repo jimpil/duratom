@@ -380,33 +380,42 @@
 (defn- duragent*
   "Common constructor for duragents"
   [init ehandler make-backend]
-  (let [ag (agent init :error-mode :continue)
+  (let [ag (agent nil :error-mode :continue)
         backend (with-meta (make-backend ag)
                            ;; force synchronous recommits
                            {:error-handler (fn [e] (throw e))})
+        storage-init (storage/snapshot backend)
         cleanup-lock (ReentrantLock.)
-        release (ut/releaser)]
-    (doto (add-watch ag
-                     ::storage/commit
-                     (fn [_ _ o n]
-                       (when (not= o n)
-                         (ut/assert-not-released! release)
-                         (try
-                           (storage/commit backend n)
-                           (catch Exception e
-                             (throw
-                               (ex-info (str "Commit error: " e)
-                                        {:type ::storage/commit-error}
-                                        e)))))))
-      (reset-meta! {::storage/destroy (partial storage/safe-cleanup! backend release cleanup-lock)
-                    ::storage/snapshot #(storage/snapshot backend)})
-      (set-error-handler!
-        (if (nil? ehandler)
-          ut/noop
-          (fn [a e]
-            (if (= ::storage/commit-error (some-> (ex-data e) :type))
-              (ehandler a (ex-cause e) #(storage/commit backend @a))
-              (ehandler a e))))))))
+        release (ut/releaser)
+        final-agent (delay
+                      (-> ag
+                          (add-watch ::storage/commit
+                             (fn [_ _ o n]
+                               (when (not= o n)
+                                 (ut/assert-not-released! release)
+                                 (try
+                                   (storage/commit backend n)
+                                   (catch Exception e
+                                     (throw
+                                       (ex-info (str "Commit error: " e)
+                                                {:type ::storage/commit-error}
+                                                e)))))))
+                          (doto
+                            (reset-meta! {::storage/destroy  (partial storage/safe-cleanup! backend release cleanup-lock)
+                                          ::storage/snapshot #(storage/snapshot backend)})
+                            (set-error-handler!
+                              (if (nil? ehandler)
+                                ut/noop
+                                (fn [a e]
+                                  (if (= ::storage/commit-error (some-> (ex-data e) :type))
+                                    (ehandler a (ex-cause e) #(storage/commit backend @a))
+                                    (ehandler a e))))))))]
+    (if (some? storage-init)
+      ;; found stuff - sync it before adding the commit watch
+      (send-off ag (constantly storage-init))
+      ;; empty storage - trigger first commit
+      (send-off @final-agent (constantly (ut/->init init))))
+    @final-agent))
 
 (defmulti duragent
           "duragent is to agent, what duratom is to atom"

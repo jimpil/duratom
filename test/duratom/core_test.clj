@@ -10,9 +10,9 @@
 (defn- common*
   [dura exists? async?]
   (let [sleep-time 200
-        f (if (instance? Agent dura)
-            send 
-            swap!)]
+        [f atom?] (if (instance? Agent dura)
+                    [send-off false]
+                    [swap! true])]
     (-> dura ;; init = {:x 1 :y 2}
         (doto (f assoc :z 3))
         (doto (f dissoc :x)))
@@ -36,14 +36,20 @@
     (when async?
       (Thread/sleep sleep-time))
 
-    (is (= [[2 3] [1 2 3]]
-           (reset-vals! dura [1 2 3])))
+    (if atom?
+      (is (= [[2 3] [1 2 3]]
+             (reset-vals! dura [1 2 3])))
+      (is (= [1 2 3]
+             (f dura (constantly [1 2 3])))))
 
     (when async?
       (Thread/sleep sleep-time))
 
-    (is (= [[1 2 3] [2 3]]
-           (swap-vals! dura rest)))
+    (if atom?
+      (is (= [[1 2 3] [2 3]]
+            (swap-vals! dura rest)))
+      (is (= [2 3]
+             (f dura rest))))
 
     (f dura (partial into (sorted-set)))
 
@@ -82,7 +88,7 @@
         _ (when (.exists (io/file rel-path))
             (io/delete-file rel-path)) ;; proper cleanup before testing
         init {:x 1 :y 2}
-        duratm (add-watch
+        dura (add-watch
                (duratom :local-file
                         :file-path rel-path
                         :init init
@@ -93,7 +99,7 @@
                                "to" (ut/pr-str-fully true new-state) "...")))]
 
     ;; empty file first
-    (common* duratm #(.exists (io/file rel-path)) async?)
+    (common* dura #(.exists (io/file rel-path)) async?)
     ;; with-contents thereafter
     (spit rel-path (pr-str init))
     (common* (add-watch
@@ -112,10 +118,9 @@
     (when async?
       (common* (duragent :local-file
                          :file-path rel-path
-                         :init init
-                         :rw default-file-rw)
+                         :init init)
                #(.exists (io/file rel-path))
-               true))
+               async?))
     )
   )
 
@@ -175,10 +180,9 @@
                          :db-config db-spec
                          :table-name table-name
                          :row-id 0
-                         :init init
-                         :rw default-postgres-rw)
+                         :init init)
                #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
-               true))
+               async?))
     )
   )
 
@@ -221,10 +225,9 @@
       (common* (duragent :redis-db
                          :db-config db-config
                          :key-name key-name
-                         :init init
-                         :rw default-redis-rw)
+                         :init init)
                key-exists?
-               true))
+               async?))
 
     ))
 
