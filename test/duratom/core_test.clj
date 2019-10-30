@@ -39,8 +39,8 @@
     (if atom?
       (is (= [[2 3] [1 2 3]]
              (reset-vals! dura [1 2 3])))
-      (is (= [1 2 3]
-             (f dura (constantly [1 2 3])))))
+      ;; don't break the assertions below
+      (f dura (constantly [1 2 3])))
 
     (when async?
       (Thread/sleep sleep-time))
@@ -48,8 +48,7 @@
     (if atom?
       (is (= [[1 2 3] [2 3]]
             (swap-vals! dura rest)))
-      (is (= [2 3]
-             (f dura rest))))
+      (f dura rest))
 
     (f dura (partial into (sorted-set)))
 
@@ -77,7 +76,8 @@
 
     (is (sorted? @dura))
     (is (= #{2 3} @dura))
-    (is (thrown? IllegalStateException (f dura conj 4)))
+    (when atom? ;; this exception is swallowed inside the agent's error handler
+      (is (thrown? IllegalStateException (f dura conj 4))))
     (is (false? (exists?)) "Storage resource was NOT cleaned-up!!!")
     )
   )

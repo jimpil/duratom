@@ -390,16 +390,15 @@
         final-agent (delay
                       (-> ag
                           (add-watch ::storage/commit
-                             (fn [_ _ o n]
-                               (when (not= o n)
-                                 (ut/assert-not-released! release)
-                                 (try
-                                   (storage/commit backend n)
-                                   (catch Exception e
-                                     (throw
-                                       (ex-info (str "Commit error: " e)
-                                                {:type ::storage/commit-error}
-                                                e)))))))
+                             (fn [_ _ _ n]
+                               (ut/assert-not-released! release)
+                               (try
+                                 (storage/commit backend n)
+                                 (catch Exception e
+                                   (throw
+                                     (ex-info (str "Commit error: " e)
+                                              {:type ::storage/commit-error}
+                                              e))))))
                           (doto
                             (reset-meta! {::storage/destroy  (partial storage/safe-cleanup! backend release cleanup-lock)
                                           ::storage/snapshot #(storage/snapshot backend)})
