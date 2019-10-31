@@ -8,6 +8,22 @@
              [io :as io]]
             [clojure.string :as str])
   (:import (clojure.lang Agent)))
+;====================================
+;; start the `default` VM:
+;$ docker-machine start default
+
+;; switch to `default` when using any docker commands
+;$ eval $(docker-machine env default)
+
+;; start up the specified containers
+;$ docker-compose up -d
+
+;; run tests
+; lein test OR selectively in repl
+
+;; shutdown the containers
+;$ docker-compose down
+;====================================
 
 (defonce docker-default-machine-ip
   ;; `localhost` which works on Ubuntu simply won't work on MacOS.
@@ -20,8 +36,8 @@
                   str/trim-newline
                   not-empty)
           (catch Throwable _))
-        ;; per https://devilbox.readthedocs.io/en/latest/howto/docker-toolbox/find-docker-toolbox-ip-address.html
-        "192.168.99.100")))
+        ;; perhaps docker-machine is not involved
+        "localhost")))
 
 (defn- common*
   [dura exists? async?]
