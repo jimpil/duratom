@@ -17,7 +17,8 @@
     (or (try
           (some-> (shell/sh "docker-machine" "ip" "default")
                   :out
-                  str/trim-newline)
+                  str/trim-newline
+                  not-empty)
           (catch Throwable _))
         ;; per https://devilbox.readthedocs.io/en/latest/howto/docker-toolbox/find-docker-toolbox-ip-address.html
         "192.168.99.100")))
