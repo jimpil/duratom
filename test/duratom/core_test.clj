@@ -3,9 +3,24 @@
             [duratom.core :refer :all]
             [duratom.utils :as ut]
             [taoensso.nippy :as nippy]
-            [clojure.java.io :as io])
-  (:import (duratom.core Duratom)
-           (clojure.lang Agent)))
+            [clojure.java
+             [shell :as shell]
+             [io :as io]]
+            [clojure.string :as str])
+  (:import (clojure.lang Agent)))
+
+(defonce docker-default-machine-ip
+  ;; `localhost` which works on Ubuntu simply won't work on MacOS.
+  ;; we need the public IP of the docker-machine - `default` in this case.
+  ;; this tends to be 192.168.99.100, but we can easily check via `docker-machine ip default`
+  (delay
+    (or (try
+          (some-> (shell/sh "docker-machine" "ip" "default")
+                  :out
+                  str/trim-newline)
+          (catch Throwable _))
+        ;; per https://devilbox.readthedocs.io/en/latest/howto/docker-toolbox/find-docker-toolbox-ip-address.html
+        "192.168.99.100")))
 
 (defn- common*
   [dura exists? async?]
@@ -134,9 +149,10 @@
 
 (defn- postgres-backed-tests*
   [async?]
-  (let [db-spec {:classname   "org.postgresql.Driver"
+  (let [ip @docker-default-machine-ip
+        db-spec {:classname   "org.postgresql.Driver"
                  :subprotocol "postgresql"
-                 :subname     "//localhost:5432/atomDB"
+                 :subname     (str "//"  ip ":5432/atomDB") ;; localhost won't work on the mac
                  :user        "dimitris"
                  :password    "secret"}
         table-name "atom_state"
@@ -196,7 +212,9 @@
 
 (defn- redis-backed-tests*
   [async?]
-  (let [db-config  {:pool {} :spec {:uri "redis://localhost:6379/"}}
+  (let [ip @docker-default-machine-ip
+        db-config  {:pool {}
+                    :spec {:uri (str "redis://" ip ":6379/")}} ;; localhost won't work on the mac
         key-name "atom:state"
         init {:x 1 :y 2}
         key-exists? #(ut/redis-key-exists? db-config key-name)
