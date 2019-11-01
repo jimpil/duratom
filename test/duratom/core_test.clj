@@ -109,10 +109,11 @@
 
     (is (sorted? @dura))
     (is (= #{2 3} @dura))
-    (when atom?
+    (if atom?
       ;; this exception can only be seen/reacted to
       ;; inside the agent's error-handler
-      (is (thrown? IllegalStateException (f dura conj 4))))
+      (is (thrown? IllegalStateException (f dura conj 4)))
+      (f dura conj 4)) ;; will trigger validator error
     (is (false? (exists?)) "Storage resource was NOT cleaned-up!!!")
     )
   )
@@ -151,17 +152,17 @@
 
     ;; duragent version
     (when async?
-      (let [sw (StringWriter.)]
+      (let [p (promise)]
         (common* (duragent :local-file
                            :file-path rel-path
                            :init init
                            :rw (assoc default-file-rw
-                                 :error-handler (fn [_ e]
-                                                  (io/copy (.getMessage e) sw))))
+                                 :error-handler
+                                 (fn [_ e] (deliver p e))))
                  #(.exists (io/file rel-path))
                  async?)
         (is (= "duratom/duragent has been released!"
-               (.toString sw)))))
+               (.getMessage @p)))))
     )
   )
 
@@ -315,9 +316,10 @@
     )
 
   (testing "PostgresDB-backed atom containing `nippy` bytes..."
-    (let [db-spec {:classname   "org.postgresql.Driver"
+    (let [ip @docker-default-machine-ip
+          db-spec {:classname   "org.postgresql.Driver"
                    :subprotocol "postgresql"
-                   :subname     "//localhost:5432/atomDB"
+                   :subname     (str "//"  ip ":5432/atomDB")
                    :user        "dimitris"
                    :password    "secret"}
           table-name "atom_state_bytes"
@@ -356,7 +358,9 @@
     )
 
   (testing "Redis DB-backed atom containing `nippy` bytes..."
-    (let [db-config  {:pool {} :spec {:uri "redis://localhost/"}}
+    (let [ip @docker-default-machine-ip
+          db-config  {:pool {}
+                      :spec {:uri (str "redis://" ip ":6379/")}}
           key-name "atom:state:bytes"
           key-exists? #(ut/redis-key-exists? db-config key-name)
           init {:x 1 :y 2}

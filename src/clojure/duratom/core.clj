@@ -387,7 +387,8 @@
                                ;; this can only be seen by
                                ;; the agent's error-handler
                                ;; NOT the caller of `send` (unlike atom `swap!`)
-                               (ut/assert-not-released! release)))
+                               (ut/assert-not-released! release)
+                               true))
         backend (with-meta (make-backend ag)
                            ;; force synchronous recommits
                            {:error-handler (fn [e] (throw e))})
