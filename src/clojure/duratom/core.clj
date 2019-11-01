@@ -416,12 +416,15 @@
     (if (some? storage-init)
       ;; found stuff - sync it before adding the commit watch
       (send-off ag (fn [& _]
-                     (deliver safe-to-add-watch? true)
+                     (future ;; make sure state has changed before adding commit watch
+                       (while (nil? @ag)
+                         (Thread/sleep 5))
+                       (deliver safe-to-add-watch? true))
                      storage-init))
       ;; empty storage - trigger first commit
       (do (deliver safe-to-add-watch? true)
           (send-off @final-agent (constantly (ut/->init init)))))
-    (and @safe-to-add-watch?
+    (and @safe-to-add-watch? ;; wait for storage syncing
          @final-agent)))
 
 (defmulti duragent
