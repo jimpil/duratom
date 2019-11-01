@@ -7,7 +7,8 @@
              [shell :as shell]
              [io :as io]]
             [clojure.string :as str])
-  (:import (clojure.lang Agent)))
+  (:import (clojure.lang Agent)
+           (java.io StringWriter)))
 ;====================================
 ;; start the `default` VM:
 ;$ docker-machine start default
@@ -108,7 +109,9 @@
 
     (is (sorted? @dura))
     (is (= #{2 3} @dura))
-    (when atom? ;; this exception is swallowed inside the agent's error handler
+    (when atom?
+      ;; this exception can only be seen/reacted to
+      ;; inside the agent's error-handler
       (is (thrown? IllegalStateException (f dura conj 4))))
     (is (false? (exists?)) "Storage resource was NOT cleaned-up!!!")
     )
@@ -148,11 +151,17 @@
 
     ;; duragent version
     (when async?
-      (common* (duragent :local-file
-                         :file-path rel-path
-                         :init init)
-               #(.exists (io/file rel-path))
-               async?))
+      (let [sw (StringWriter.)]
+        (common* (duragent :local-file
+                           :file-path rel-path
+                           :init init
+                           :rw (assoc default-file-rw
+                                 :error-handler (fn [_ e]
+                                                  (io/copy (.getMessage e) sw))))
+                 #(.exists (io/file rel-path))
+                 async?)
+        (is (= "duratom/duragent has been released!"
+               (.toString sw)))))
     )
   )
 

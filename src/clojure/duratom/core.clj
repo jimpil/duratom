@@ -380,19 +380,24 @@
 (defn- duragent*
   "Common constructor for duragents"
   [init meta-map ehandler make-backend]
-  (let [ag (agent nil :error-mode :continue)
+  (let [release (ut/releaser)
+        ag (agent nil
+                  :error-mode :continue
+                  :validator (fn [_]
+                               ;; this can only be seen by
+                               ;; the agent's error-handler
+                               ;; NOT the caller of `send` (unlike atom `swap!`)
+                               (ut/assert-not-released! release)))
         backend (with-meta (make-backend ag)
                            ;; force synchronous recommits
                            {:error-handler (fn [e] (throw e))})
         storage-init (storage/snapshot backend)
         cleanup-lock (ReentrantLock.)
-        release (ut/releaser)
         safe-to-add-watch? (promise)
         final-agent (delay
                       (-> ag
                           (add-watch ::storage/commit
                              (fn [_ _ _ n]
-                               (ut/assert-not-released! release)
                                (try
                                  (storage/commit backend n)
                                  (catch Exception e
@@ -401,11 +406,12 @@
                                               {:type ::storage/commit-error}
                                               e))))))
                           (doto
-                            (reset-meta! (merge meta-map
-                                                {::storage/destroy
-                                                 (partial storage/safe-cleanup! backend release cleanup-lock)
-                                                 ::storage/snapshot
-                                                 #(storage/snapshot backend)}))
+                            (reset-meta!
+                              (merge meta-map
+                                     {::storage/destroy
+                                      (partial storage/safe-cleanup! backend release cleanup-lock)
+                                      ::storage/snapshot
+                                      #(storage/snapshot backend)}))
                             (set-error-handler!
                               (if (nil? ehandler)
                                 ut/noop
