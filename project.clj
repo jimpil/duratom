@@ -12,6 +12,16 @@
   :source-paths      ["src/clojure"]
   :java-source-paths ["src/java"]
   :javac-options     ["--release" "8"]
+
+  :release-tasks [["vcs" "assert-committed"]
+                  ["change" "version" "leiningen.release/bump-version" "release"]
+                  ["vcs" "commit"]
+                  ["vcs" "tag" "--no-sign"]
+                  ["deploy"]
+                  ["change" "version" "leiningen.release/bump-version"]
+                  ["vcs" "commit"]
+                  ;["vcs" "push"]
+                  ]
   :deploy-repositories [["releases" :clojars]] ;; lein release :patch
   :signing {:gpg-key "jimpil1985@gmail.com"}
   )
