@@ -35,7 +35,6 @@ The public API consists of two constructor function (`duratom.core/duratom` and 
 are applicable to both apart from `:commit-mode`, which is a no-op for `duragent`. 
 Once you have constructed a duratom object, you can use it just like a regular atom, with the slight addition that when 
 you're done with it, you can call `duratom.core/destroy` on it to clear the durable backend (e.g. delete the file/table).
-
 Subsequent mutating operations are prohibited (only `deref`ing will work).
 
 ### Example
@@ -164,7 +163,7 @@ As explained in [this](https://www.nitor.com/fi/uutiset-ja-blogi/pitfalls-and-bu
 Tests require PostreSQL and Redis server installed on your machine.
 Another option is to use the provided Docker compose configuration in the following way:
 
-1. Install [docker](https://docs.docker.com/install/), [docker-machine](https://docs.docker.com/machine/install-machine/), [docker-compose](https://docs.docker.com/compose/install/), and finally VirtualBox.
+1. Install [docker](https://docs.docker.com/install/), [docker-machine](https://docs.docker.com/machine/install-machine/), and [docker-compose](https://docs.docker.com/compose/install/).
 2. Create a docker-machine with command `docker-machine create default` (one-off step).
 3. Start all databases with command `docker-compose up -d` (or omit the `-d` to spawn the process in the foreground).
 4. Now you can run tests freely.
