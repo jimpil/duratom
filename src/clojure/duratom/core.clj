@@ -379,7 +379,7 @@
 
 (defn- duragent*
   "Common constructor for duragents"
-  [init ehandler make-backend]
+  [init meta-map ehandler make-backend]
   (let [ag (agent nil :error-mode :continue)
         backend (with-meta (make-backend ag)
                            ;; force synchronous recommits
@@ -387,6 +387,7 @@
         storage-init (storage/snapshot backend)
         cleanup-lock (ReentrantLock.)
         release (ut/releaser)
+        safe-to-add-watch? (promise)
         final-agent (delay
                       (-> ag
                           (add-watch ::storage/commit
@@ -400,8 +401,11 @@
                                               {:type ::storage/commit-error}
                                               e))))))
                           (doto
-                            (reset-meta! {::storage/destroy  (partial storage/safe-cleanup! backend release cleanup-lock)
-                                          ::storage/snapshot #(storage/snapshot backend)})
+                            (reset-meta! (merge meta-map
+                                                {::storage/destroy
+                                                 (partial storage/safe-cleanup! backend release cleanup-lock)
+                                                 ::storage/snapshot
+                                                 #(storage/snapshot backend)}))
                             (set-error-handler!
                               (if (nil? ehandler)
                                 ut/noop
@@ -411,10 +415,14 @@
                                     (ehandler a e))))))))]
     (if (some? storage-init)
       ;; found stuff - sync it before adding the commit watch
-      (send-off ag (constantly storage-init))
+      (send-off ag (fn [& _]
+                     (deliver safe-to-add-watch? true)
+                     storage-init))
       ;; empty storage - trigger first commit
-      (send-off @final-agent (constantly (ut/->init init))))
-    @final-agent))
+      (do (deliver safe-to-add-watch? true)
+          (send-off @final-agent (constantly (ut/->init init)))))
+    (and @safe-to-add-watch?
+         @final-agent)))
 
 (defmulti duragent
           "duragent is to agent, what duratom is to atom"
@@ -422,17 +430,17 @@
             backed-by))
 
 (defmethod duragent :local-file
-  [_ & {:keys [file-path init rw]
+  [_ & {:keys [file-path init rw meta]
         :or {rw default-file-rw}}]
   (let [make-backend (partial storage/->FileBackend
                               (doto (jio/file file-path)
                                 (.createNewFile))
                               (:read rw)
                               (:write rw))]
-    (duragent* init (:error-handler rw) make-backend)))
+    (duragent* init meta (:error-handler rw) make-backend)))
 
 (defmethod duragent :postgres-db
-  [_ & {:keys [db-config table-name row-id init lock rw]
+  [_ & {:keys [db-config table-name row-id init lock rw meta]
         :or {lock (ReentrantLock.)
              rw default-postgres-rw}}]
   (let [make-backend (partial storage/->PGSQLBackend
@@ -444,10 +452,10 @@
                               row-id
                               (:read rw)
                               (:write rw))]
-    (duragent* init (:error-handler rw) make-backend)))
+    (duragent* init meta (:error-handler rw) make-backend)))
 
 (defmethod duragent :aws-s3
-  [_ & {:keys [credentials bucket key init lock rw]
+  [_ & {:keys [credentials bucket key init lock rw meta]
         :or {lock (ReentrantLock.)
              rw default-s3-rw}}]
   (let [make-backend (partial storage/->S3Backend
@@ -460,10 +468,10 @@
                               (:metadata rw)
                               (:read rw)
                               (:write rw))]
-    (duragent* init (:error-handler rw) make-backend)))
+    (duragent* init meta (:error-handler rw) make-backend)))
 
 (defmethod duragent :redis-db
-  [_ & {:keys [db-config key-name init lock rw]
+  [_ & {:keys [db-config key-name init lock rw meta]
         :or {lock (ReentrantLock.)
              rw default-redis-rw}}]
   (let [make-backend (partial storage/->RedisBackend
@@ -471,4 +479,4 @@
                               key-name
                               (:read rw)
                               (:write rw))]
-    (duragent* init (:error-handler rw) make-backend)))
+    (duragent* init meta (:error-handler rw) make-backend)))
