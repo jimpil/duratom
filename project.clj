@@ -8,7 +8,8 @@
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
                                   [amazonica "0.3.58"]
                                   [com.taoensso/carmine "2.19.1"]
-                                  [com.taoensso/nippy "2.13.0"]]}}
+                                  [com.taoensso/nippy "2.13.0"]
+                                  [http-kit "2.4.0-alpha3"]]}}
   :source-paths      ["src/clojure"]
   :java-source-paths ["src/java"]
   :javac-options     ["--release" "8"]

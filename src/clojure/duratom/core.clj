@@ -345,6 +345,27 @@
                                            (:write rw))}
                    (select-keys rw [:commit-mode :error-handler])))))
 
+(def default-fileio-rw
+  {:read  ut/read-edn-object
+   :write (partial ut/pr-str-fully true)
+   :commit-mode DEFAULT_COMMIT_MODE})
+
+(defn fileio-atom
+  ([http-post! key-duratom]
+   (fileio-atom http-post! key-duratom (ReentrantLock.) nil))
+  ([http-post! key-duratom lock initial-value]
+   (fileio-atom http-post! key-duratom lock initial-value default-fileio-rw))
+  ([http-post! key-duratom lock initial-value rw]
+   (map->Duratom (merge
+                   {:lock lock
+                    :init initial-value
+                    :make-backend (partial storage/->FileIOBackend
+                                           http-post!
+                                           key-duratom
+                                           (:read rw)
+                                           (:write rw))}
+                   (select-keys rw [:commit-mode :error-handler])))))
+
 (defmulti duratom
           "Top level constructor function for the <Duratom> class.
    Built-in <backed-by> types are `:local-file`, `:postgres-db`, `:redis-db` & `:aws-s3`."
@@ -374,6 +395,13 @@
         :or {lock (ReentrantLock.)
              rw default-redis-rw}}]
   (redis-atom db-config key-name lock init rw))
+
+(defmethod duratom :file.io
+  [_ & {:keys [http-post! key-duratom init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-fileio-rw}}]
+  (fileio-atom http-post! key-duratom lock init rw))
+
 ;;=========================================================
 ;;=======================DURAGENT==========================
 
@@ -487,6 +515,17 @@
   (let [make-backend (partial storage/->RedisBackend
                               db-config
                               key-name
+                              (:read rw)
+                              (:write rw))]
+    (duragent* init meta (:error-handler rw) make-backend)))
+
+(defmethod duragent :file.io
+  [_ & {:keys [http-post! key-duratom init lock rw meta]
+        :or {lock (ReentrantLock.)
+             rw default-fileio-rw}}]
+  (let [make-backend (partial storage/->FileIOBackend
+                              http-post!
+                              key-duratom
                               (:read rw)
                               (:write rw))]
     (duragent* init meta (:error-handler rw) make-backend)))
