@@ -89,9 +89,9 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
 ;; firstly we need a function to do the POST-ing
 (defn http-post
   [url ^String data]
-  (http/post url ;; this should work both with `http-kit` and `clj-http`
-    {:form-params {:text data}
-     :headers {"Content-Type" "application/x-www-form-urlencoded"}}))
+  @(http/post url ;; assuming `http-kit`
+     {:form-params {:text data}
+      :headers {"Content-Type" "application/x-www-form-urlencoded"}}))
 
 ;; secondly we need a duratom to hold the (ever-changing) key
 (def key-duratom 

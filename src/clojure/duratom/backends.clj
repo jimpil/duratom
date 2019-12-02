@@ -1,8 +1,7 @@
 (ns duratom.backends
   (:require [duratom.utils :as ut])
-  (:import (java.io File IOException)
-           (clojure.lang Agent Atom)
-           (duratom.core Duratom)))
+  (:import (java.io File IOException Closeable)
+           (clojure.lang Agent Atom)))
 
 (defprotocol ICommiter
   (commit! [this f ef]
@@ -156,7 +155,9 @@
 (defrecord FileIOBackend [http-post key-duratom read-it! write-it! committer]
   IStorageBackend
   (snapshot [this]
-    (when-let [ret (some-> (ut/fileIO-get! @key-duratom) read-it!)]
+    (when-let [ret (some-> @key-duratom
+                           ut/fileIO-get!
+                           read-it!)]
       (reset! key-duratom nil)
       (commit this) ;; reading it deleted it so re-upload it
       ret))
@@ -174,6 +175,6 @@
         (commit! committer f))))
   (cleanup [_]
     (some-> @key-duratom ut/fileIO-get!)
-    (.close ^Duratom key-duratom)
+    (.close ^Closeable key-duratom)
     )
   )
