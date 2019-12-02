@@ -103,7 +103,7 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
          :key-duratom key-duratom 
          :init {:x 1 :y 2})
 
-;; finally it's worth noting that the file.io backend might not work with non-text. In other words, `nippy` might not work.
+;; finally it's worth noting that the file.io backend expects text. In other words, `nippy` might not work here.
 ```
 
 The initial-value <init> can be a concrete value (as show above), but also a no-arg fn or a delay. In any case, it may end up being completely ignored (i.e. if the underlying persistent storage is found to be non-empty).
