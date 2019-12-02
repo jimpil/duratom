@@ -106,7 +106,7 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
 ;; finally it's worth noting that the file.io backend expects text. In other words, `nippy` might not work here.
 ```
 
-The initial-value <init> can be a concrete value (as show above), but also a no-arg fn or a delay. In any case, it may end up being completely ignored (i.e. if the underlying persistent storage is found to be non-empty).
+The initial-value <init> can be a concrete value (as shown above), but also a no-arg fn, or a `delay`. In any case, it may end up being completely ignored (i.e. if the underlying persistent storage is found to be non-empty).
 If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom`, `s3-atom`, `redis-atom` 
 and `fileio-atom` equivalents.
 
