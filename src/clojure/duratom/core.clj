@@ -363,7 +363,8 @@
                                            http-post!
                                            key-duratom
                                            (:read rw)
-                                           (:write rw))}
+                                           (:write rw)
+                                           (:expiry rw "2w"))} ;; two weeks by default
                    (select-keys rw [:commit-mode :error-handler])))))
 
 (defmulti duratom
@@ -527,5 +528,6 @@
                               http-post!
                               key-duratom
                               (:read rw)
-                              (:write rw))]
+                              (:write rw)
+                              (:expiry rw "2w"))]
     (duragent* init meta (:error-handler rw) make-backend)))

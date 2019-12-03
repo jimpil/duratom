@@ -149,13 +149,13 @@
     (force x))) ;; `force` returns x if not a delay
 
 (defonce noop (constantly nil))
-(defonce FILE-IO-URL "https://file.io")
+(defonce FILE-IO-URL "https://file.io/")
 
 (defn fileIO-get!
   "Returns the file specified by key <k> on file.io."
   ^bytes [k]
   (when (some? k)
-    (let [urlk (URL. (str FILE-IO-URL \/ k))
+    (let [urlk (URL. (str FILE-IO-URL k))
           baos (ByteArrayOutputStream.)]
       (with-open [in  (jio/input-stream urlk)
                   out baos]
@@ -170,9 +170,9 @@
            peek))
 
 (defn fileIO-post!
-  [http-post! data]
+  [http-post! data expiry]
   (when (some? data)
-    (let [resp (http-post! FILE-IO-URL data)]
+    (let [resp (http-post! (str FILE-IO-URL "?expires=" expiry) data)]
       (if (= 200 (:status resp))
         (fileIO-key (:body resp))
         (throw

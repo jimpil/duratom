@@ -143,7 +143,7 @@
 
 ;;================================<file.io>======================================
 
-(defrecord FileIOBackend [http-post key-duratom read-it! write-it! committer]
+(defrecord FileIOBackend [http-post key-duratom expiry read-it! write-it! committer]
   IStorageBackend
   (snapshot [this]
     (when-let [ret (some-> @key-duratom ut/fileIO-get! read-it!)]
