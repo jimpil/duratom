@@ -155,7 +155,7 @@
   (commit [this x]
     (let [f (fn [state]
               (let [previous-k @key-duratom
-                    new-k (ut/fileIO-post! http-post (write-it! (?deref state x)))]
+                    new-k (ut/fileIO-post! http-post (write-it! (?deref state x)) expiry)]
                 (reset! key-duratom new-k)
                 (ut/fileIO-get! previous-k) ;; delete previous
                 state))]
