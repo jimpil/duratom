@@ -166,7 +166,7 @@ In order to fully understand error-handling, the distinction between a regular c
 
 As established in the previous section, by default a `duratom` will dispatch commits of the new state (of the underlying atom) via an internal agent. This setup gains async commit semantics, but doesn't play nicely with re-committing in the provided error-handler (per the previous paragraph), simply because the atom's state might have changed by the time the recommit fires. A synchronous `duratom` doesn't suffer from this symptom, as the entire commit call stays behind a lock (as opposed to `send-off` which escapes the scope of the lock). Neither does a `duragent`, because the recommit will happen on the agent's dispatch thread before any pending sends (i.e. synchronously wrt to the original commit).
 
-####TL:DR 
+#### TL:DR 
 If you use `duratom`, and you also want to be able to safely recommit from within the error-handler, consider using it in synchronous commit-mode, or switch to `duragent`.
 
 
