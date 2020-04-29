@@ -1,11 +1,10 @@
 (ns duratom.backends
   (:require [duratom.utils :as ut])
-  (:import (java.io File IOException)
+  (:import (java.io File IOException Closeable)
            (clojure.lang Agent Atom)))
 
 (defprotocol ICommiter
-  (commit! [this f ef]
-           [this f]))
+  (commit! [this f ef]))
 
 (defn- sync-commit*
   [c f handle-error]
@@ -17,12 +16,12 @@
 (extend-protocol ICommiter
   Agent  ;; asynchronous
   (commit!
-    ([this f]
-     (send-off this f))
-    ([this f handle-error]
-     ;; delegate to the synchronous Atom(applicable to duratom recommits),
-     ;; or Object(applicable to all duragent commits) implementation
-     (commit! (deref this) f handle-error)))
+    [this f handle-error]
+    (if (some? handle-error)
+      ;; delegate to the synchronous Atom(applicable to duratom recommits),
+      ;; or Object(applicable to all duragent commits) implementation
+      (commit! (deref this) f handle-error)
+      (send-off this f)))
   Atom   ;; synchronous
   (commit! [this f handle-error]
     (sync-commit* this f handle-error))
@@ -79,9 +78,7 @@
     (let [f (fn [state]
               (save-to-file! write-it! (.getPath file) (?deref state x))
               state)]
-      (if-let [ehandler (get-error-handler this)]
-        (commit! committer f ehandler)
-        (commit! committer f))))
+      (commit! committer f (get-error-handler this))))
   (cleanup [_]
     (or (.delete file) ;; simply delete the file
         (throw (IOException. (str "Could not delete " (.getPath file))))))
@@ -102,9 +99,7 @@
     (let [f (fn [state]
               (save-to-db! config table-name row-id write-it! (?deref state x))
               state)]
-      (if-let [ehandler (get-error-handler this)]
-        (commit! committer f ehandler)
-        (commit! committer f))))
+      (commit! committer f (get-error-handler this))))
   (cleanup [_]
     (ut/delete-relevant-row! config table-name row-id)) ;;drop the relevant row
   )
@@ -125,9 +120,7 @@
     (let [f (fn [state]
               (save-to-s3! credentials bucket k write-it! (?deref state x))
               state)]
-      (if-let [ehandler (get-error-handler this)]
-        (commit! committer f ehandler)
-        (commit! committer f))))
+      (commit! committer f (get-error-handler this))))
   (cleanup [_]
     (ut/delete-object-from-s3 credentials bucket k)) ;;drop the whole object
   )
@@ -144,8 +137,31 @@
     (let [f (fn [state]
               (ut/redis-set conn key-name (write-it! (?deref state x)))
               state)]
-      (if-let [ehandler (get-error-handler this)]
-        (commit! committer f ehandler)
-        (commit! committer f))))
+      (commit! committer f (get-error-handler this))))
   (cleanup [_]
     (ut/redis-del conn key-name)))
+
+;;================================<file.io>======================================
+
+(defrecord FileIOBackend [http-post key-duratom expiry read-it! write-it! committer]
+  IStorageBackend
+  (snapshot [this]
+    (when-let [ret (some-> @key-duratom ut/fileIO-get! read-it!)]
+      (reset! key-duratom nil)
+      (commit this) ;; reading it deleted it so re-upload it
+      ret))
+  (commit [this]
+    (commit this ::deref))
+  (commit [this x]
+    (let [f (fn [state]
+              (let [previous-k @key-duratom
+                    new-k (ut/fileIO-post! http-post (write-it! (?deref state x)) expiry)]
+                (reset! key-duratom new-k)
+                (ut/fileIO-get! previous-k) ;; delete previous
+                state))]
+      (commit! committer f (get-error-handler this))))
+  (cleanup [_]
+    (some-> @key-duratom ut/fileIO-get!)
+    (.close ^Closeable key-duratom)
+    )
+  )

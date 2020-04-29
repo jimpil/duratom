@@ -17,6 +17,7 @@ In order to provide durability `duratom`/`duragent` will persist its state to so
  2. A postgres DB table row
  3. An AWS-S3 bucket key
  4. A Redis DB key (*)
+ 5. [file.io](https://www.file.io/)(**)
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
@@ -28,6 +29,23 @@ Main difference between `duratom` & `enduro` is that an `enduro` atom is not a d
 Main difference between `duratom` & `durable-atom` is that a `durable-atom` atom doesn't have a second level of polymorphism to accommodate for switching storage backends. It assumes that a file-backed atom is always what you want. Moreover, it uses `slurp` & `spit` for reading/writing to the disk, which, in practice, puts a limit on how big data-structures you can fit in a String (depending on your hardware & JVM configuration of course). Finally, it uses `locking` which is problematic on some JVMs (e.g. certain IBM JVM versions). `duratom` uses the `java.util.concurrent.locks.Lock` interface instead.
 
 (*) Redis is an in-memory data structure store with optional [persistence](https://redis.io/topics/persistence). It might not be the best option in those cases where you absolutely cannot lose the state backed by `duratom`. But if you can, it is a fast, flexible and lightweight backend option for the durable atom. Moreover, it's worth noting that the value in the atom (wrapped by duratom) will exist in two places in memory (regular atom + Redis).
+
+(**) `file.io` is an interesting service. Not only is it free, but also effectively unlimited (when not abused). 
+Yes, there are practical limits with respect to file-sizes and rate-limits on the (public) API, but in certain use cases these can be
+mitigated. For instance, a duratom (or a duragent for that matter) never reads from storage after it's been initialised - it only writes. Therefore, in a low-write situation (which is the ideal use-case anyway) the API rate-limiting just isn't a concern. 
+Sizes if up to 5GB(!) are allowed, but since we're sending a String over, the effective limit is actually around 2GB.
+The tricky thing is to manage the ephemeral nature of the service, and to avoid abusing it. In order to achieve this, and maintain
+persistence guarrantees, two things are required. The backend object itself must be clever enough to restore the state on 
+every read (as discussed there is only one of those), and to delete previous states on every new commit. 
+The caller must provide a `key-duratom` that will hold the unique ID of each new commit (a short String).
+ If the system crashes, that `key-duratom` will allow the fileio-duratom to restore its state. This does make things 
+ slightly more complicated, but since the key is fundamentally dynamic (changes on each commit), there is no other way around it.
+ Finally, the caller must provide a `:http-post!` fn of two arguments (URL and a String) - see below in the example section for 
+ the specifics, and a good candidate fn that should work with both [clj-http](https://github.com/dakrone/clj-http) and 
+ [http-kit](https://www.http-kit.org/client.html).     
+  
+
+
 
 ## Usage
 
@@ -65,10 +83,32 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
          :db-config "any db-spec as understood by carmine"
          :key-name "my:key"
          :init {:x 1 :y 2})
+
+;; backed by file.io
+
+;; firstly we need a function to do the POST-ing
+(defn http-post
+  [url ^String data]
+  @(http/post url ;; assuming `http-kit`
+     {:form-params {:text data}
+      :headers {"Content-Type" "application/x-www-form-urlencoded"}}))
+
+;; secondly we need a duratom to hold the (ever-changing) key
+(def key-duratom 
+  (duratom :local-file :file-path "/tmp/fio.key")) ;; no init!
+
+;; we are now ready to create the final duratom
+(duratom :file.io
+         :http-post!  http-post
+         :key-duratom key-duratom 
+         :init {:x 1 :y 2})
+
+;; finally it's worth noting that the file.io backend expects text. In other words, `nippy` might not work here.
 ```
 
-The initial-value <init> can be a concrete value (as show above), but also a no-arg fn or a delay. In any case, it may end up being completely ignored (i.e. if the underlying persistent storage is found to be non-empty).
-If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom` & `s3-atom` equivalents.
+The initial-value <init> can be a concrete value (as shown above), but also a no-arg fn, or a `delay`. In any case, it may end up being completely ignored (i.e. if the underlying persistent storage is found to be non-empty).
+If you prefer passing arguments positionally, you can use the `file-atom`, `postgres-atom`, `s3-atom`, `redis-atom` 
+and `fileio-atom` equivalents.
 
 ## Custom :read & :write
 
@@ -126,7 +166,7 @@ In order to fully understand error-handling, the distinction between a regular c
 
 As established in the previous section, by default a `duratom` will dispatch commits of the new state (of the underlying atom) via an internal agent. This setup gains async commit semantics, but doesn't play nicely with re-committing in the provided error-handler (per the previous paragraph), simply because the atom's state might have changed by the time the recommit fires. A synchronous `duratom` doesn't suffer from this symptom, as the entire commit call stays behind a lock (as opposed to `send-off` which escapes the scope of the lock). Neither does a `duragent`, because the recommit will happen on the agent's dispatch thread before any pending sends (i.e. synchronously wrt to the original commit).
 
-####TL:DR 
+#### TL:DR 
 If you use `duratom`, and you also want to be able to safely recommit from within the error-handler, consider using it in synchronous commit-mode, or switch to `duragent`.
 
 

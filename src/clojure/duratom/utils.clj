@@ -2,7 +2,7 @@
   (:require [clojure.java.io :as jio]
             [clojure.edn :as edn]
             [duratom.readers :as readers])
-  (:import (java.io PushbackReader BufferedWriter)
+  (:import (java.io PushbackReader BufferedWriter ByteArrayOutputStream)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
@@ -10,7 +10,8 @@
            (dbaos DirectByteArrayOutputStream)
            (java.security MessageDigest)
            (java.util Base64)
-           (duratom.readers ObjectWithMeta)))
+           (duratom.readers ObjectWithMeta)
+           (java.net URL)))
 
 (try
   (require '[clojure.java.jdbc :as sql])
@@ -147,8 +148,36 @@
     (x)
     (force x))) ;; `force` returns x if not a delay
 
-(def noop (constantly nil))
+(defonce noop (constantly nil))
 (defn identity [x & _] x)
+(defonce FILE-IO-URL "https://file.io/")
+
+(defn fileIO-get!
+  "Returns the file specified by key <k> on file.io."
+  ^bytes [k]
+  (when (some? k)
+    (let [urlk (URL. (str FILE-IO-URL k))
+          baos (ByteArrayOutputStream.)]
+      (with-open [in  (jio/input-stream urlk)
+                  out baos]
+        (jio/copy in out)
+        (.toByteArray out)))))
+
+(defn- fileIO-key
+  [^String response]
+  (some->> response
+           (re-seq #"(\"key\":)\"(\w*)\"")
+           first
+           peek))
+
+(defn fileIO-post!
+  [http-post! data expiry]
+  (when (some? data)
+    (let [resp (http-post! (str FILE-IO-URL "?expires=" expiry) data)]
+      (if (= 200 (:status resp))
+        (fileIO-key (:body resp))
+        (throw
+          (IllegalStateException. "HTTP POST failed! Aborting..."))))))
 
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!
