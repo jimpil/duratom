@@ -4,82 +4,174 @@
             [clojure.java.io :as jio]
             [duratom.readers :as readers]
             [duratom.utils :as ut])
-  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj Atom IAtom2 Agent IReference)
+  (:import (clojure.lang IAtom IDeref IRef ARef IMeta IObj IAtom2 Agent IReference)
            (java.util.concurrent.locks ReentrantLock Lock)
            (java.io Writer Closeable)))
 ;; ================================================================
 
+(defonce DEFAULT_COMMIT_MODE   ::async)
+(defonce DEFAULT_READ_LOCATION ::memory)
+(def ^:dynamic *atom-ctor*     atom)
+
+(defmacro with-atom-ctor
+  "Binds *atom-ctor* to the provided <ctor> (1-arg) fn,
+   and executes body. Helpful for creating duratom(s) that
+   wrap IAtom(s) other than clojure.lang.Atom - what the
+   default one (`clojure.core/atom`) returns."
+  [ctor & body]
+  `(binding [*atom-ctor* ~ctor] ~@body))
+
+(defn- async?
+  "Returns true if the commit-mode <cmode>
+   provided is either nil or ::async."
+  [cmode]
+  (or (= cmode DEFAULT_COMMIT_MODE)
+      (nil? cmode)))
+
+(defn- memory-reads?
+  "Returns true if the read-from <loc>
+   provided is either nil or ::memory."
+  [loc]
+  (or (= loc DEFAULT_READ_LOCATION)
+      (nil? loc)))
+
+(defmacro ^:private with-read-location
+  [loc mem-expr storage-backend f args]
+  `(if (memory-reads? ~loc)
+     ~mem-expr
+     (apply ~f (some-> ~storage-backend storage/snapshot) ~args)))
+
 (deftype Duratom
-  [storage-backend ^Atom underlying-atom ^Lock lock release]
+  [storage-backend underlying-atom ^Lock lock release read-from]
 
   IAtom2 ;; the new interface introduced in 1.9
   (swapVals [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [[_ n :as result] (.swapVals underlying-atom f)]
-        (storage/commit storage-backend n)
+      (let [[o n :as result] (with-read-location
+                               read-from
+                               (swap-vals! underlying-atom f)
+                               storage-backend
+                               (juxt ut/identity f)
+                               nil)]
+        (when (not= o n)
+          (storage/commit storage-backend n))
         result)))
   (swapVals [_ f arg1]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [[_ n :as result] (.swapVals underlying-atom f arg1)]
-        (storage/commit storage-backend n)
+      (let [[o n :as result] (with-read-location
+                               read-from
+                               (swap-vals! underlying-atom f arg1)
+                               storage-backend
+                               (juxt ut/identity f)
+                               (list arg1))]
+        (when (not= o n)
+          (storage/commit storage-backend n))
         result)))
-  (swapVals [_ f arg1 arg2]
+  (swapVals [o f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [[_ n :as result] (.swapVals underlying-atom f arg1 arg2)]
-        (storage/commit storage-backend n)
+      (let [[_ n :as result] (with-read-location
+                               read-from
+                               (swap-vals! underlying-atom f arg1 arg2)
+                               storage-backend
+                               (juxt ut/identity f)
+                               (list arg1 arg2))]
+        (when (not= o n)
+          (storage/commit storage-backend n))
         result)))
   (swapVals [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [[_ n :as result] (.swapVals underlying-atom f arg1 arg2 more)]
-        (storage/commit storage-backend n)
+      (let [[o n :as result] (with-read-location
+                               read-from
+                               (swap-vals! underlying-atom f arg1 arg2 more)
+                               storage-backend
+                               (juxt ut/identity f)
+                               (list* arg1 arg2 more))]
+        (when (not= o n)
+          (storage/commit storage-backend n))
         result)))
-  (resetVals [_ newvals]
+  (resetVals [_ newval]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [[_ n :as result] (.resetVals underlying-atom newvals)]
-        (storage/commit storage-backend n)
+      (let [[o n :as result] (with-read-location
+                               read-from
+                               (reset-vals! underlying-atom newval)
+                               storage-backend
+                               (juxt ut/identity (constantly newval))
+                               nil)]
+        (when (not= o n)
+          (storage/commit storage-backend n))
         result)))
 
   IAtom
   (swap [_ f]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f)]
+      (let [result (with-read-location
+                     read-from
+                     (swap! underlying-atom f)
+                     storage-backend
+                     f
+                     nil)]
         (storage/commit storage-backend result)
         result)))
   (swap [_ f arg]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f arg)]
+      (let [result (with-read-location
+                     read-from
+                     (swap! underlying-atom f arg)
+                     storage-backend
+                     f
+                     (list arg))]
         (storage/commit storage-backend result)
         result)))
   (swap [_ f arg1 arg2]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f arg1 arg2)]
+      (let [result (with-read-location
+                     read-from
+                     (swap! underlying-atom f arg1 arg2)
+                     storage-backend
+                     f (list arg1 arg2))]
         (storage/commit storage-backend result)
         result)))
   (swap [_ f arg1 arg2 more]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.swap underlying-atom f arg1 arg2 more)]
+      (let [result (with-read-location
+                     read-from
+                     (.swap underlying-atom f arg1 arg2 more)
+                     storage-backend
+                     f
+                     (list* arg1 arg2 more))]
         (storage/commit storage-backend result)
         result)))
-  (compareAndSet [_ oldv newv]
+  (compareAndSet [_ oldval newval]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.compareAndSet underlying-atom oldv newv)]
-        (when result
-          (storage/commit storage-backend result))
-        result)))
+      (let [commit? (with-read-location
+                      read-from
+                      (compare-and-set! underlying-atom oldval newval)
+                      storage-backend
+                      (partial = oldval)
+                      nil)]
+        (when commit?
+          ;; commit the new value - NOT boolean (what `compare-and-set!` returned)
+          (storage/commit storage-backend newval))
+        commit?)))
   (reset [_ newval]
     (ut/assert-not-released! release)
     (ut/with-locking lock
-      (let [result (.reset underlying-atom newval)]
+      (let [result (with-read-location
+                     read-from
+                     (reset! underlying-atom newval)
+                     nil
+                     (constantly newval)
+                     nil)]
         (storage/commit storage-backend result)
         result)))
   IRef ;; watches/validators/meta/deref works against the underlying atom
@@ -97,10 +189,15 @@
     (.getWatches ^ARef underlying-atom))
   IDeref
   (deref [_]
-    (.deref underlying-atom))
+    (with-read-location
+      read-from
+      (.deref underlying-atom)
+      storage-backend
+      ut/identity
+      nil))
   IObj
   (withMeta [_ meta-map]
-    (Duratom. storage-backend (with-meta underlying-atom meta-map) ^Lock lock release))
+    (Duratom. storage-backend (with-meta underlying-atom meta-map) ^Lock lock release read-from))
   IMeta
   (meta [_]
     (meta underlying-atom))
@@ -123,15 +220,6 @@
   (.write w (-> (.-underlying_atom dura) deref pr-str))
   (.write w "}")
   )
-
-(defonce DEFAULT_COMMIT_MODE ::async)
-
-(defn- async?
-  "Returns true if the commit-mode <cmode>
-   provided is either nil or ::async."
-  [cmode]
-  (or (= cmode DEFAULT_COMMIT_MODE)
-      (nil? cmode)))
 
 (defn- recommit-fn
   [backend]
@@ -180,11 +268,13 @@
 
 (defn- ->Duratom
   ([make-backend lock init commits]
-   (->Duratom make-backend lock init commits nil))
-  ([make-backend lock init commits handle-error]
+   (->Duratom make-backend lock init commits :memory))
+  ([make-backend lock init commits read-from]
+   (->Duratom make-backend lock init commits read-from nil))
+  ([make-backend lock init commits read-from handle-error]
    (assert (ut/lock? lock)
            "The <lock> provided is NOT a valid implementation of `java.util.concurrent.locks.Lock`!")
-   (let [raw-atom (atom nil)
+   (let [raw-atom (*atom-ctor* nil)
          async-commits? (async? commits)
          backend* (cond-> raw-atom
                           async-commits? (agent :error-mode :continue)
@@ -193,19 +283,25 @@
                    ;; need to do this on a separate step
                    (add-agent-error-handler backend* handle-error)
                    (add-atom-error-handler backend* handle-error))
-         duratom (Duratom. backend raw-atom lock (ut/releaser))
-         storage-init (storage/snapshot backend)]
-     (if (some? storage-init) ;; found stuff - sync it
-       (do ;; reset the raw atom directly to avoid writing exactly what was read
-         (reset! raw-atom storage-init)
-         duratom)
-       (cond-> duratom
-               (some? init)
-               (doto (reset! (ut/->init init)))))))) ;; empty storage means we start off with <initial-value>
+         duratom (Duratom. backend raw-atom lock (ut/releaser) read-from)
+         storage-init (storage/snapshot backend)
+         reset? (memory-reads? read-from)]
 
-(defn- map->Duratom [m]
-  (let [{:keys [make-backend lock init commit-mode error-handler]} m]
-    (->Duratom make-backend lock init commit-mode error-handler)))
+     (if (and (some? storage-init) ;; found stuff - sync it
+              reset?)
+       ;; reset the raw atom directly to avoid writing exactly what was read
+       (reset! raw-atom storage-init)
+       (when (some? init)
+         ;; empty storage means we start off with <initial-value>
+         (if reset?
+           (reset! duratom (ut/->init init))
+           (storage/commit backend init))))
+
+     duratom)))
+
+(defn map->Duratom
+  [{:keys [make-backend lock init commit-mode read-from error-handler]}]
+  (->Duratom make-backend lock init commit-mode read-from error-handler))
 
 
 ;;==================<PUBLIC API>==========================
@@ -232,6 +328,7 @@
 (def default-file-rw
   {:read  ut/read-edn-object  ;; for nippy use `nippy/thaw-from-file`
    :write ut/write-edn-object ;; for nippy use `nippy/freeze-to-file`
+   :read-from DEFAULT_READ_LOCATION
    :commit-mode DEFAULT_COMMIT_MODE} ;; technically not needed but leaving it for transparency
   )
 
@@ -258,6 +355,7 @@
   {:read  ut/read-edn-string             ;; for nippy use `nippy/thaw`
    :write (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
    :column-type :text                    ;; for nippy use :bytea
+   :read-from DEFAULT_READ_LOCATION
    :commit-mode DEFAULT_COMMIT_MODE} ;; technically not needed but leaving it for transparency
   )
 
@@ -293,6 +391,7 @@
            (partial ut/read-edn-object readers/default) ;; this will be called with two args
            {:ignore-size? true}) ;; for nippy use `(comp nippy/thaw ut/s3-bucket-bytes)`
    :write      (partial ut/pr-str-fully true)  ;; for nippy use `nippy/freeze`
+   :read-from DEFAULT_READ_LOCATION
    :commit-mode DEFAULT_COMMIT_MODE ;; technically not needed but leaving it for transparency
    ;:metadata {:server-side-encryption "AES256"}
    })
@@ -325,6 +424,7 @@
    ;; So by just replacing these functions with `identity` they will be serialized with Nippy
    :read  ut/read-edn-string
    :write (partial ut/pr-str-fully true)
+   :read-from DEFAULT_READ_LOCATION
    :commit-mode DEFAULT_COMMIT_MODE}) ;; technically not needed but leaving it for transparency)
 
 (defn redis-atom

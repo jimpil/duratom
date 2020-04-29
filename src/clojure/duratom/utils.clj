@@ -148,6 +148,7 @@
     (force x))) ;; `force` returns x if not a delay
 
 (def noop (constantly nil))
+(defn identity [x & _] x)
 
 ;;===============<DB-UTILS>=====================================
 (defn update-or-insert!
