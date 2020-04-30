@@ -144,7 +144,7 @@
     (ut/with-locking lock
       (let [result (with-read-location
                      read-from
-                     (.swap underlying-atom f arg1 arg2 more)
+                     (apply swap! underlying-atom f arg1 arg2 more)
                      storage-backend
                      f
                      (list* arg1 arg2 more))]
@@ -176,22 +176,22 @@
         result)))
   IRef ;; watches/validators/meta/deref works against the underlying atom
   (setValidator [_ validator]
-    (.setValidator underlying-atom validator))
+    (.setValidator ^IRef underlying-atom validator))
   (getValidator [_]
-    (.getValidator underlying-atom))
+    (.getValidator ^IRef underlying-atom))
   (addWatch [this watch-key watch-fn]
-    (.addWatch underlying-atom watch-key watch-fn)
+    (.addWatch ^IRef underlying-atom watch-key watch-fn)
     this)
   (removeWatch [this watch-key]
-    (.removeWatch underlying-atom watch-key)
+    (.removeWatch ^IRef underlying-atom watch-key)
     this)
   (getWatches [_]
-    (.getWatches ^ARef underlying-atom))
+    (.getWatches ^IRef underlying-atom))
   IDeref
   (deref [_]
     (with-read-location
       read-from
-      (.deref underlying-atom)
+      (deref underlying-atom)
       storage-backend
       ut/identity
       nil))
@@ -203,9 +203,9 @@
     (meta underlying-atom))
   IReference
   (resetMeta [_ meta-map]
-    (.resetMeta underlying-atom meta-map))
+    (reset-meta! underlying-atom meta-map))
   (alterMeta [_ f args]
-    (.alterMeta underlying-atom f args))
+    (alter-meta! underlying-atom f args))
   Closeable
   (close [_]
     (storage/safe-cleanup! storage-backend release lock))
@@ -320,7 +320,7 @@
    the persistent storage of a duratom/duragent manually."
   [dura]
   (condp instance? dura
-    Duratom (storage/snapshot (.-storage_backend dura))
+    Duratom (storage/snapshot (.-storage_backend ^Duratom dura))
     Agent (when-let [snap (some-> (meta dura) ::storage/snapshot)]
             (snap))))
 

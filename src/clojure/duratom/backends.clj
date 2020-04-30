@@ -1,7 +1,8 @@
 (ns duratom.backends
   (:require [duratom.utils :as ut])
   (:import (java.io File IOException Closeable)
-           (clojure.lang Agent Atom)))
+           (clojure.lang Agent Atom)
+           (java.util.concurrent.locks Lock)))
 
 (defprotocol ICommiter
   (commit! [this f ef]))
@@ -37,7 +38,7 @@
   (cleanup  [this]))
 
 (defn safe-cleanup!
-  [storage release lock]
+  [storage release ^Lock lock]
   (when-not (release)
     (ut/with-locking lock
       (cleanup storage)
