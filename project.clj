@@ -1,4 +1,4 @@
-(defproject duratom "0.5.3-SNAPSHOT"
+(defproject duratom "0.5.3"
   :description "A durable atom/agent type for Clojure."
   :url "https://github.com/jimpil/duratom"
   :license {:name "Eclipse Public License"
