@@ -1,4 +1,5 @@
 (ns duratom.utils
+  (:refer-clojure :exclude [identity])
   (:require [clojure.java.io :as jio]
             [clojure.edn :as edn]
             [duratom.readers :as readers])
