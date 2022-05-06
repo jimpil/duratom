@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module cursive.leiningen.project.LeiningenProjectsManager.displayName="duratom:0.5.2-SNAPSHOT" cursive.leiningen.project.LeiningenProjectsManager.isLeinModule="true" version="4">
+<module cursive.leiningen.project.LeiningenProjectsManager.displayName="duratom:0.5.3-SNAPSHOT" cursive.leiningen.project.LeiningenProjectsManager.isLeinModule="true" version="4">
+  <component name="BuildSystem">
+    <option name="buildSystemId" value="LEININGEN" />
+    <option name="displayName" value="duratom:0.5.3-SNAPSHOT" />
+  </component>
   <component name="NewModuleRootManager">
     <output url="file://$MODULE_DIR$/target/classes" />
     <output-test url="file://$MODULE_DIR$/target/classes" />
