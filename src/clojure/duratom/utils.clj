@@ -202,13 +202,18 @@
                                                         [[:id :int] [:value col-type]]))
     (catch BatchUpdateException _ '(0)))) ;; table already exists!
 
-(defn get-pgsql-value [db table-name row-id read-it!]
+(defn get-sql-value [db table-name row-id read-it!]
   (sql/query db [(str "SELECT value FROM " table-name " WHERE id = " row-id " LIMIT 1")]
              {:row-fn (comp read-it! :value)
               :result-set-fn first}))
 
-(defn table-exists? [db table-name]
+(defn postgres-table-exists? [db table-name]
   (sql/query db ["SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"]
+             {:row-fn :table_name
+              :result-set-fn (comp some? (partial some #{table-name}))}))
+
+(defn sqlite-table-exists? [db table-name]
+  (sql/query db ["SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"]
              {:row-fn :table_name
               :result-set-fn (comp some? (partial some #{table-name}))}))
 
