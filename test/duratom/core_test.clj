@@ -285,12 +285,12 @@
 
 (defn- sqlite-backed-tests*
   [async?]
-  (let [rel-path "sqlite-test.sqlite"
-        _ (when (.exists (io/file rel-path))
-            (io/delete-file rel-path)) ;; proper cleanup before testing
+  (let [subname "sqlite-test.sqlite"
+        _ (when (.exists (io/file subname))
+            (io/delete-file subname)) ;; proper cleanup before testing
         db-spec {:classname   "org.sqlite.JDBC"
                  :subprotocol "sqlite"
-                 :subname     "sqlite-test.sqlite"
+                 :subname     subname
                  :user        "dimitris"
                  :password    "secret"}
         table-name "atom_state"
@@ -336,7 +336,9 @@
                          :row-id 0
                          :init init)
                #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
-               async?))))
+               async?))
+    ;; manually delete sqlite file to clean up
+    (.delete (io/file subname))))
 
 (deftest sqlite-backed-tests
   (println "SQLite-backed atom/agent with async commit...")
