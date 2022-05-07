@@ -6,6 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.1" :scope "provided"]]
   :profiles {:dev {:dependencies [[org.clojure/java.jdbc "0.6.1"]
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
+                                  [org.xerial/sqlite-jdbc "3.36.0.3"]
                                   [amazonica "0.3.58"]
                                   [com.taoensso/carmine "2.19.1"]
                                   [com.taoensso/nippy "2.13.0"]

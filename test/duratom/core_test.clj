@@ -199,7 +199,7 @@
 
     ;; empty row first
     (common* dura
-             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
+             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
              async?)
     ;; with-contents thereafter
     (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
@@ -214,7 +214,7 @@
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
-             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
+             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
              async?)
 
     ;; duragent version
@@ -224,7 +224,7 @@
                          :table-name table-name
                          :row-id 0
                          :init init)
-               #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
+               #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
                async?))
     )
   )
@@ -283,6 +283,70 @@
   (redis-backed-tests* false)
   )
 
+(defn- sqlite-backed-tests*
+  [async?]
+  (let [subname "sqlite-test.sqlite"
+        _ (when (.exists (io/file subname))
+            (io/delete-file subname)) ;; proper cleanup before testing
+        db-spec {:classname   "org.sqlite.JDBC"
+                 :subprotocol "sqlite"
+                 :subname     subname
+                 :user        "dimitris"
+                 :password    "secret"}
+        table-name "atom_state"
+        _ (ut/delete-relevant-row! db-spec table-name 0)
+        init {:x 1 :y 2}
+        dura (add-watch
+              (duratom :sqlite-db
+                       :db-config db-spec
+                       :table-name table-name
+                       :row-id 0
+                       :init init
+                       :rw (cond-> default-sqlite-rw
+                             (not async?) (assoc :commit-mode :sync)))
+              :log (fn [k, r, old-state, new-state]
+                     (println "Transitioning from" (ut/pr-str-fully true old-state)
+                              "to" (ut/pr-str-fully true new-state) "...")))]
+
+    ;; empty row first
+    (common* dura
+             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+             async?)
+    ;; with-contents thereafter
+    (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
+    (common* (add-watch
+              (duratom :sqlite-db
+                       :db-config db-spec
+                       :table-name table-name
+                       :row-id 0
+                       :init init
+                       :rw (cond-> default-postgres-rw
+                             (not async?) (assoc :commit-mode :sync)))
+              :log (fn [k, r, old-state, new-state]
+                     (println "Transitioning from" (ut/pr-str-fully true old-state)
+                              "to" (ut/pr-str-fully true new-state) "...")))
+             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+             async?)
+
+    ;; duragent version
+    (when async?
+      (common* (duragent :sqlite-db
+                         :db-config db-spec
+                         :table-name table-name
+                         :row-id 0
+                         :init init)
+               #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+               async?))
+    ;; manually delete sqlite file to clean up
+    (.delete (io/file subname))))
+
+(deftest sqlite-backed-tests
+  (println "SQLite-backed atom/agent with async commit...")
+  (sqlite-backed-tests* true)
+  (println "SQLite-backed atom with sync commit...")
+  (sqlite-backed-tests* false)
+  )
+
 (deftest custom-rw-tests
 
   (testing "File-backed atom containing `nippy` bytes..."
@@ -338,7 +402,7 @@
 
       ;; empty row first
       (common* dura
-               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw))
+               #(some? (ut/get-sql-value db-spec table-name 0 nippy/thaw))
                true)
       ;; with-contents thereafter
       (ut/update-or-insert! db-spec table-name {:id 0 :value (nippy/freeze init)} ["id = ?" 0])
@@ -352,7 +416,7 @@
                                :column-type :bytea})
                  :log (fn [k, r, old-state, new-state]
                         (println "Transitioning from" old-state "to" new-state "...")))
-               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw))
+               #(some? (ut/get-sql-value db-spec table-name 0 nippy/thaw))
                true)
       )
     )
