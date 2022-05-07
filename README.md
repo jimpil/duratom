@@ -15,9 +15,10 @@ In order to provide durability `duratom`/`duragent` will persist its state to so
 
  1. A file on the local file-system
  2. A postgres DB table row
- 3. An AWS-S3 bucket key
- 4. A Redis DB key (*)
- 5. [file.io](https://www.file.io/)(**)
+ 3. A SQLite DB table row
+ 4. An AWS-S3 bucket key
+ 5. A Redis DB key (*)
+ 6. [file.io](https://www.file.io/)(**)
 
 Note: Several ideas taken/adapted/combined from [enduro](https://github.com/alandipert/enduro) & [durable-atom](https://github.com/polygloton/durable-atom)
 
@@ -66,6 +67,13 @@ Subsequent mutating operations are prohibited (only `deref`ing will work).
 
 ;; backed by postgres-db
 (duratom :postgres-db
+         :db-config "any db-spec as understood by clojure.java.jdbc"
+         :table-name "my_table"
+         :row-id 0
+         :init {:x 1 :y 2})
+
+;; backed by sqlite-db
+(duratom :sqlite-db
          :db-config "any db-spec as understood by clojure.java.jdbc"
          :table-name "my_table"
          :row-id 0
@@ -195,6 +203,8 @@ As explained in [this](https://www.nitor.com/fi/uutiset-ja-blogi/pitfalls-and-bu
 ### Optional Requirements
 
 - [clojure.java.jdbc](https://github.com/clojure/java.jdbc) >= 0.6.0
+    - [org.postgresql/postgresql](https://github.com/pgjdbc/pgjdbc)
+    - [org.xerial/sqlite-jdbc](https://github.com/xerial/sqlite-jdbc)
 - [amazonica](https://github.com/mcohen01/amazonica)
 - [carmine](https://github.com/ptaoussanis/carmine)
 
