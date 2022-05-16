@@ -520,7 +520,7 @@
 (defmethod duratom :sqlite-db
   [_ & {:keys [db-config table-name row-id init lock rw]
         :or {lock (ReentrantLock.)
-             rw default-postgres-rw}}]
+             rw default-sqlite-rw}}]
   (sqlite-atom db-config table-name row-id lock init rw))
 
 (defmethod duratom :aws-s3
@@ -619,7 +619,7 @@
 (defmethod duragent :postgres-db
   [_ & {:keys [db-config table-name row-id init lock rw meta]
         :or {lock (ReentrantLock.)
-             rw default-postgres-rw}}]
+             rw default-sqlite-rw}}]
   (let [make-backend (partial storage/->PGSQLBackend
                               db-config
                               (if (ut/postgres-table-exists? db-config table-name)
