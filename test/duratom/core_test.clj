@@ -199,7 +199,7 @@
 
     ;; empty row first
     (common* dura
-             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
              async?)
     ;; with-contents thereafter
     (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
@@ -214,7 +214,7 @@
                :log (fn [k, r, old-state, new-state]
                       (println "Transitioning from" (ut/pr-str-fully true old-state)
                                "to" (ut/pr-str-fully true new-state) "...")))
-             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+             #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
              async?)
 
     ;; duragent version
@@ -224,7 +224,7 @@
                          :table-name table-name
                          :row-id 0
                          :init init)
-               #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+               #(some? (ut/get-pgsql-value db-spec table-name 0 ut/read-edn-string))
                async?))
     )
   )
@@ -310,7 +310,7 @@
 
     ;; empty row first
     (common* dura
-             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+             #(some? (ut/get-sqlite-value db-spec table-name 0 ut/read-edn-string))
              async?)
     ;; with-contents thereafter
     (ut/update-or-insert! db-spec table-name {:id 0 :value (pr-str init)} ["id = ?" 0])
@@ -325,7 +325,7 @@
               :log (fn [k, r, old-state, new-state]
                      (println "Transitioning from" (ut/pr-str-fully true old-state)
                               "to" (ut/pr-str-fully true new-state) "...")))
-             #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+             #(some? (ut/get-sqlite-value db-spec table-name 0 ut/read-edn-string))
              async?)
 
     ;; duragent version
@@ -335,7 +335,7 @@
                          :table-name table-name
                          :row-id 0
                          :init init)
-               #(some? (ut/get-sql-value db-spec table-name 0 ut/read-edn-string))
+               #(some? (ut/get-sqlite-value db-spec table-name 0 ut/read-edn-string))
                async?))
     ;; manually delete sqlite file to clean up
     (io/delete-file filename)))
@@ -402,7 +402,7 @@
 
       ;; empty row first
       (common* dura
-               #(some? (ut/get-sql-value db-spec table-name 0 nippy/thaw))
+               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw))
                true)
       ;; with-contents thereafter
       (ut/update-or-insert! db-spec table-name {:id 0 :value (nippy/freeze init)} ["id = ?" 0])
@@ -416,7 +416,7 @@
                                :column-type :bytea})
                  :log (fn [k, r, old-state, new-state]
                         (println "Transitioning from" old-state "to" new-state "...")))
-               #(some? (ut/get-sql-value db-spec table-name 0 nippy/thaw))
+               #(some? (ut/get-pgsql-value db-spec table-name 0 nippy/thaw))
                true)
       )
     )

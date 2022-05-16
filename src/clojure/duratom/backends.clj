@@ -93,7 +93,7 @@
 (defrecord PGSQLBackend [config table-name row-id read-it! write-it! committer]
   IStorageBackend
   (snapshot [_]
-    (ut/get-sql-value config table-name row-id read-it!))
+    (ut/get-pgsql-value config table-name row-id read-it!))
   (commit [this]
     (commit this ::deref))
   (commit [this x]
@@ -173,7 +173,7 @@
 (defrecord SQLiteBackend [config table-name row-id read-it! write-it! committer]
   IStorageBackend
   (snapshot [_]
-    (ut/get-sql-value config table-name row-id read-it!))
+    (ut/get-sqlite-value config table-name row-id read-it!))
   (commit [this]
     (commit this ::deref))
   (commit [this x]
