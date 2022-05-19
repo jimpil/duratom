@@ -619,7 +619,7 @@
 (defmethod duragent :postgres-db
   [_ & {:keys [db-config table-name row-id init lock rw meta]
         :or {lock (ReentrantLock.)
-             rw default-sqlite-rw}}]
+             rw default-postgres-rw}}]
   (let [make-backend (partial storage/->PGSQLBackend
                               db-config
                               (if (ut/postgres-table-exists? db-config table-name)
@@ -634,7 +634,7 @@
 (defmethod duragent :sqlite-db
   [_ & {:keys [db-config table-name row-id init lock rw meta]
         :or {lock (ReentrantLock.)
-             rw default-postgres-rw}}]
+             rw default-sqlite-rw}}]
   (let [make-backend (partial storage/->SQLiteBackend
                               db-config
                               (if (ut/sqlite-table-exists? db-config table-name)
