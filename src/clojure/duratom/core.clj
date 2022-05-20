@@ -374,7 +374,7 @@
                     :init initial-value
                     :make-backend (partial storage/->PGSQLBackend
                                            db-config
-                                           (if (ut/table-exists? db-config table-name)
+                                           (if (ut/postgres-table-exists? db-config table-name)
                                              table-name
                                              (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
                                                  table-name))
@@ -382,6 +382,38 @@
                                            (:read rw)
                                            (:write rw))}
                    (select-keys rw [:commit-mode :error-handler])))))
+
+(def default-sqlite-rw
+  {:read  ut/read-edn-string             ;; for nippy use `nippy/thaw`
+   :write (partial ut/pr-str-fully true) ;; for nippy use `nippy/freeze`
+   :column-type :text                    ;; for nippy use :bytea
+   :read-from DEFAULT_READ_LOCATION
+   :commit-mode DEFAULT_COMMIT_MODE} ;; technically not needed but leaving it for transparency
+  )
+
+(defn sqlite-atom
+  "Creates and returns a SQLite-backed atom. If the location denoted by the combination of <db-config> and <table-name> exists,
+   it is read and becomes the initial value. Otherwise, the initial value is <init> and the table <table-name> is updated."
+  ([db-config table-name]
+   (sqlite-atom db-config table-name 0 (ReentrantLock.) nil))
+  ([db-config table-name row-id]
+   (sqlite-atom db-config table-name row-id (ReentrantLock.) nil))
+  ([db-config table-name row-id lock initial-value]
+   (sqlite-atom db-config table-name row-id lock initial-value default-sqlite-rw))
+  ([db-config table-name row-id lock initial-value rw]
+   (map->Duratom (merge
+                  {:lock lock
+                   :init initial-value
+                   :make-backend (partial storage/->SQLiteBackend
+                                          db-config
+                                          (if (ut/sqlite-table-exists? db-config table-name)
+                                            table-name
+                                            (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
+                                                table-name))
+                                          row-id
+                                          (:read rw)
+                                          (:write rw))}
+                  (select-keys rw [:commit-mode :error-handler])))))
 
 (def default-s3-rw
   ;; `edn/read` doesn't make use of the object size, so no reason to fetch it from S3 (we communicate that via metadata).
@@ -468,10 +500,10 @@
                    (select-keys rw [:commit-mode :error-handler])))))
 
 (defmulti duratom
-          "Top level constructor function for the <Duratom> class.
-   Built-in <backed-by> types are `:local-file`, `:postgres-db`, `:redis-db` & `:aws-s3`."
-          (fn [backed-by & _args]
-            backed-by))
+  "Top level constructor function for the <Duratom> class.
+   Built-in <backed-by> types are `:local-file`, `:postgres-db`, `:sqlite-db`, `:redis-db` & `:aws-s3`."
+  (fn [backed-by & _args]
+    backed-by))
 
 (defmethod duratom :local-file
   [_ & {:keys [file-path init lock rw]
@@ -484,6 +516,12 @@
         :or {lock (ReentrantLock.)
              rw default-postgres-rw}}]
   (postgres-atom db-config table-name row-id lock init rw))
+
+(defmethod duratom :sqlite-db
+  [_ & {:keys [db-config table-name row-id init lock rw]
+        :or {lock (ReentrantLock.)
+             rw default-sqlite-rw}}]
+  (sqlite-atom db-config table-name row-id lock init rw))
 
 (defmethod duratom :aws-s3
   [_ & {:keys [credentials bucket key init lock rw]
@@ -584,7 +622,22 @@
              rw default-postgres-rw}}]
   (let [make-backend (partial storage/->PGSQLBackend
                               db-config
-                              (if (ut/table-exists? db-config table-name)
+                              (if (ut/postgres-table-exists? db-config table-name)
+                                table-name
+                                (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
+                                    table-name))
+                              row-id
+                              (:read rw)
+                              (:write rw))]
+    (duragent* init meta (:error-handler rw) make-backend)))
+
+(defmethod duragent :sqlite-db
+  [_ & {:keys [db-config table-name row-id init lock rw meta]
+        :or {lock (ReentrantLock.)
+             rw default-sqlite-rw}}]
+  (let [make-backend (partial storage/->SQLiteBackend
+                              db-config
+                              (if (ut/sqlite-table-exists? db-config table-name)
                                 table-name
                                 (do (ut/create-dedicated-table! db-config table-name (:column-type rw))
                                     table-name))

@@ -166,3 +166,21 @@
     (.close ^Closeable key-duratom)
     )
   )
+
+
+;=================================<SQLite>======================================
+
+(defrecord SQLiteBackend [config table-name row-id read-it! write-it! committer]
+  IStorageBackend
+  (snapshot [_]
+    (ut/get-sqlite-value config table-name row-id read-it!))
+  (commit [this]
+    (commit this ::deref))
+  (commit [this x]
+    (let [f (fn [state]
+              (save-to-db! config table-name row-id write-it! (?deref state x))
+              state)]
+      (commit! committer f (get-error-handler this))))
+  (cleanup [_]
+    (ut/delete-relevant-row! config table-name row-id)) ;;drop the relevant row
+  )

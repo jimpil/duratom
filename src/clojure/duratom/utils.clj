@@ -207,8 +207,15 @@
              {:row-fn (comp read-it! :value)
               :result-set-fn first}))
 
-(defn table-exists? [db table-name]
+(def get-sqlite-value get-pgsql-value)
+
+(defn postgres-table-exists? [db table-name]
   (sql/query db ["SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"]
+             {:row-fn :table_name
+              :result-set-fn (comp some? (partial some #{table-name}))}))
+
+(defn sqlite-table-exists? [db table-name]
+  (sql/query db ["SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"]
              {:row-fn :table_name
               :result-set-fn (comp some? (partial some #{table-name}))}))
 

@@ -7,7 +7,6 @@
                                                           :sha "5f2b5c2efb444df76fb5252102b33f542ebf7f58"}
                                org.clojure/java.jdbc {:mvn/version "0.6.1"}
                                org.postgresql/postgresql {:mvn/version "9.4.1208.jre7"}
+                               org.xerial/sqlite-jdbc {:mvn/version "3.36.0.3"}
                                com.taoensso/nippy {:mvn/version "2.13.0"}
-                               amazonica {:mvn/version "0.3.58"}}}
-           }
- }
+                               amazonica/amazonica {:mvn/version "0.3.58"}}}}}
