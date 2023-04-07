@@ -3,12 +3,12 @@
   (:require [clojure.java.io :as jio]
             [clojure.edn :as edn]
             [duratom.readers :as readers])
-  (:import (java.io PushbackReader BufferedWriter ByteArrayOutputStream)
+  (:import (java.io ByteArrayOutputStream PushbackReader BufferedWriter)
            (java.nio.file StandardCopyOption Files)
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
            (java.sql BatchUpdateException)
-           (dbaos DirectByteArrayOutputStream)
+           ;(dbaos DirectByteArrayOutputStream)
            (java.security MessageDigest)
            (java.util Base64)
            (duratom.readers ObjectWithMeta)
@@ -20,7 +20,8 @@
     (require '[duratom.not-found.jdbc :as sql])))
 
 (try
-  (require '[amazonica.aws.s3 :as aws])
+  (require '[amazonica.aws.s3 :as aws]
+           '[amazonica.aws.s3transfer])
   (catch Exception e
     (require '[duratom.not-found.s3 :as aws])))
 
@@ -52,14 +53,13 @@
              true (apply pr-str))))
 
 (defn s3-bucket-bytes
-  "A helper for pulling out the bytes out of an S3 bucket,
-   which has the potential for zero copying."
+  "A helper for pulling out the bytes out of an S3 bucket."
   (^bytes [s3-in]
    (s3-bucket-bytes 4096 s3-in))
   (^bytes [buffer-size s3-in]
    (with-open [in (jio/input-stream s3-in)
-               out (DirectByteArrayOutputStream. (int buffer-size))] ;; allows for copy-less streaming when size is known
-     (jio/copy in out :buffer-size buffer-size) ;; minimize number of loops required to fill the `out` buffer
+               out (ByteArrayOutputStream. (int buffer-size))]
+     (jio/copy in out :buffer-size buffer-size)
      (.toByteArray out))))
 
 (defn read-edn-object
@@ -229,13 +229,13 @@
                    ;; make sure the reader needs the object-size, otherwise don't bother
                    (:content-length (aws/get-object-metadata creds bucket-name k)))]
     (->> (aws/get-object creds
-                         :bucket bucket-name
+                         :bucket-name bucket-name
                          :key k
                          :metadata metadata)
          :input-stream
          (read-it! obj-size))))
 
-(defn store-value-to-s3 [creds bucket k value]
+(defn store-value-to-s3 [creds bucket k metadata value]
   (let [^bytes val-bytes (if (string? value)
                            (.getBytes ^String value)
                            value)]
@@ -243,8 +243,9 @@
       :bucket-name bucket
       :key k
       :input-stream (jio/input-stream val-bytes)
-      :metadata {:content-length (alength val-bytes)
-                 :content-md5 (md5sum val-bytes)})))
+      :metadata (merge metadata
+                       {:content-length (alength val-bytes)
+                        :content-md5 (md5sum val-bytes)}))))
 
 (defn delete-object-from-s3 [credentials bucket-name k]
   (aws/delete-object credentials bucket-name k))
@@ -265,3 +266,18 @@
 
 (defn redis-key-exists? [db-config key-name]
   (= 1 (car/wcar db-config (car/exists key-name))))
+
+(comment
+  (def creds {:access-key "..."         ;; <= replace with yours
+              :secret-key "..."         ;; <= replace with yours
+              :endpoint   "eu-west-1"}) ;; <= replace with yours
+  (def dummy-value (pr-str {:a 1 :b 2}))
+  ;; check a bucket I know exists
+  (bucket-exists? creds "jimpil-test") ;; => true
+  ;; create a brand new one (with public access!)
+  (create-s3-bucket creds "jimpil-test-delete-me") ;; => {:name "jimpil-test-delete-me"}
+  (store-value-to-s3 creds "jimpil-test" "dummy.edn" {} dummy-value)
+  (get-value-from-s3  creds "jimpil-test" "dummy.edn" {} (partial read-edn-object {})) ;; => {:a 1, :b 2}
+  (delete-object-from-s3 creds "jimpil-test" "dummy.edn") ;; => nil (but succeeded)
+
+  )

@@ -3,11 +3,11 @@
   :url "https://github.com/jimpil/duratom"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.10.1" :scope "provided"]]
+  :dependencies [[org.clojure/clojure "1.11.1" :scope "provided"]]
   :profiles {:dev {:dependencies [[org.clojure/java.jdbc "0.6.1"]
                                   [org.postgresql/postgresql "9.4.1208.jre7"] ;; PGSQL driver
                                   [org.xerial/sqlite-jdbc "3.36.0.3"]
-                                  [amazonica "0.3.58"]
+                                  [amazonica "0.3.163"]
                                   [com.taoensso/carmine "2.19.1"]
                                   [com.taoensso/nippy "2.13.0"]
                                   [http-kit "2.4.0-alpha3"]]}}

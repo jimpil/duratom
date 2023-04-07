@@ -3,7 +3,7 @@ package dbaos;
 import java.io.ByteArrayOutputStream;
 
 /**
- * A ByteArrayOutputStream whose `.toByteArray()` method returns the internal buffer (as opposed to copying it).
+ * ----------------------DON'T USE!-------------------------------------
  */
 public class DirectByteArrayOutputStream extends ByteArrayOutputStream {
 

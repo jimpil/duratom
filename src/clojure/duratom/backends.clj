@@ -12,7 +12,8 @@
   (try
     (f c)
     (catch Exception e
-      (handle-error e))))
+      (when handle-error
+        (handle-error e)))))
 
 (extend-protocol ICommiter
   Agent  ;; asynchronous
@@ -108,8 +109,8 @@
 ;;==========================<AMAZON-S3>=============================================
 
 (defn- save-to-s3!
-  [credentials bucket k write-it! x]
-  (ut/store-value-to-s3 credentials bucket k (write-it! x)))
+  [credentials bucket k metadata write-it! x]
+  (ut/store-value-to-s3 credentials bucket k metadata (write-it! x)))
 
 (defrecord S3Backend [credentials bucket k metadata read-it! write-it! committer]
   IStorageBackend
@@ -119,7 +120,7 @@
     (commit this ::deref))
   (commit [this x]
     (let [f (fn [state]
-              (save-to-s3! credentials bucket k write-it! (?deref state x))
+              (save-to-s3! credentials bucket k metadata write-it! (?deref state x))
               state)]
       (commit! committer f (get-error-handler this))))
   (cleanup [_]
