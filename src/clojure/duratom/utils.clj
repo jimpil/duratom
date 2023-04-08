@@ -85,9 +85,9 @@
    (write-edn-object true filepath data))
   ([unpack-meta? filepath data]
    (with-open [^BufferedWriter w (jio/writer filepath)]
-     (->> data
-          (pr-str-fully unpack-meta?)
-          (.write w)))))
+     (binding [*print-length* nil
+               *out* w]
+       (pr (cond-> data unpack-meta? iobj->edn-tag))))))
 
 (defn read-edn-objects ;; not used anywhere - remove???
   "Efficiently multiple data structures from a stream."
