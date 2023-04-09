@@ -221,11 +221,18 @@
 
 ;; S3 utils
 
+(defn- s3-creds* [creds]
+  (if (fn? creds)
+    (creds) ;; generator-fn - should produce the 3/4 keys we expect
+    creds))
+
 (defn create-s3-bucket [creds bucket-name]
-  (aws/create-bucket creds bucket-name))
+  (-> (s3-creds* creds)
+      (aws/create-bucket bucket-name)))
 
 (defn get-value-from-s3 [creds bucket-name k metadata read-it!]
-  (let [obj-size (when-not (-> read-it! meta :ignore-size?)
+  (let [creds (s3-creds* creds)
+        obj-size (when-not (-> read-it! meta :ignore-size?)
                    ;; make sure the reader needs the object-size, otherwise don't bother
                    (:content-length (aws/get-object-metadata creds bucket-name k)))]
     (->> (aws/get-object creds
@@ -239,7 +246,7 @@
   (let [^bytes val-bytes (if (string? value)
                            (.getBytes ^String value)
                            value)]
-    (aws/put-object creds
+    (aws/put-object (s3-creds* creds)
       :bucket-name bucket
       :key k
       :input-stream (jio/input-stream val-bytes)
@@ -247,11 +254,13 @@
                        {:content-length (alength val-bytes)
                         :content-md5 (md5sum val-bytes)}))))
 
-(defn delete-object-from-s3 [credentials bucket-name k]
-  (aws/delete-object credentials bucket-name k))
+(defn delete-object-from-s3 [creds bucket-name k]
+  (-> (s3-creds* creds)
+      (aws/delete-object bucket-name k)))
 
 (defn bucket-exists? [creds bucket-name]
-  (aws/does-bucket-exist creds bucket-name))
+  (-> (s3-creds* creds)
+      (aws/does-bucket-exist bucket-name)))
 
 ;;===============<REDIS-UTILS>=====================================
 
