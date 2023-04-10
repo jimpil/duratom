@@ -8,7 +8,6 @@
            (java.util.concurrent.locks Lock)
            (java.util.concurrent.atomic AtomicBoolean)
            (java.sql BatchUpdateException)
-           ;(dbaos DirectByteArrayOutputStream)
            (java.security MessageDigest)
            (java.util Base64)
            (duratom.readers ObjectWithMeta)
@@ -234,25 +233,35 @@
   (let [creds (s3-creds* creds)
         obj-size (when-not (-> read-it! meta :ignore-size?)
                    ;; make sure the reader needs the object-size, otherwise don't bother
-                   (:content-length (aws/get-object-metadata creds bucket-name k)))]
-    (->> (aws/get-object creds
-                         :bucket-name bucket-name
-                         :key k
-                         :metadata metadata)
-         :input-stream
-         (read-it! obj-size))))
+                   (:content-length (aws/get-object-metadata creds bucket-name k)))
+        obj (try
+              (aws/get-object creds
+                              :bucket-name bucket-name
+                              :key k
+                              :metadata metadata)
+              (catch Exception e
+                ;; circumvent the fact that I can't import AWS-SDK classes in here
+                (let [classname (-> e class .getCanonicalName)]
+                  ;; if the key is not found return nil
+                  (when-not (and (= classname "com.amazonaws.services.s3.model.AmazonS3Exception")
+                                 (re-find #"Error Code: NoSuchKey" (.getMessage e)))
+                    (throw e)))))]
+    (some->> obj
+             :input-stream
+             (read-it! obj-size))))
 
 (defn store-value-to-s3 [creds bucket k metadata value]
   (let [^bytes val-bytes (if (string? value)
                            (.getBytes ^String value)
                            value)]
-    (aws/put-object (s3-creds* creds)
-      :bucket-name bucket
-      :key k
-      :input-stream (jio/input-stream val-bytes)
-      :metadata (merge metadata
-                       {:content-length (alength val-bytes)
-                        :content-md5 (md5sum val-bytes)}))))
+    (-> (s3-creds* creds)
+        (aws/put-object
+          :bucket-name bucket
+          :key k
+          :input-stream (jio/input-stream val-bytes)
+          :metadata (merge metadata
+                           {:content-length (alength val-bytes)
+                            :content-md5 (md5sum val-bytes)})))))
 
 (defn delete-object-from-s3 [creds bucket-name k]
   (-> (s3-creds* creds)
