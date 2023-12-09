@@ -340,15 +340,14 @@
   ([file-path lock initial-value]
    (file-atom file-path lock initial-value default-file-rw))
   ([file-path lock initial-value rw] ;;read-write details
-   (map->Duratom (merge
+   (map->Duratom (merge rw
                    {:lock lock ;; allow for explicit nil
                     :init initial-value
                     :make-backend (partial storage/->FileBackend
                                            (doto (jio/file file-path)
                                              (.createNewFile))
                                            (:read rw)
-                                           (:write rw))}
-                   (select-keys rw [:commit-mode :error-handler])))))
+                                           (:write rw))}))))
 
 
 (def default-postgres-rw
@@ -369,7 +368,7 @@
   ([db-config table-name row-id lock initial-value]
    (postgres-atom db-config table-name row-id lock initial-value default-postgres-rw))
   ([db-config table-name row-id lock initial-value rw]
-   (map->Duratom (merge
+   (map->Duratom (merge rw
                    {:lock lock
                     :init initial-value
                     :make-backend (partial storage/->PGSQLBackend
@@ -380,8 +379,7 @@
                                                  table-name))
                                            row-id
                                            (:read rw)
-                                           (:write rw))}
-                   (select-keys rw [:commit-mode :error-handler])))))
+                                           (:write rw))}))))
 
 (def default-sqlite-rw
   {:read  ut/read-edn-string             ;; for nippy use `nippy/thaw`
@@ -401,7 +399,7 @@
   ([db-config table-name row-id lock initial-value]
    (sqlite-atom db-config table-name row-id lock initial-value default-sqlite-rw))
   ([db-config table-name row-id lock initial-value rw]
-   (map->Duratom (merge
+   (map->Duratom (merge rw
                   {:lock lock
                    :init initial-value
                    :make-backend (partial storage/->SQLiteBackend
@@ -412,8 +410,7 @@
                                                 table-name))
                                           row-id
                                           (:read rw)
-                                          (:write rw))}
-                  (select-keys rw [:commit-mode :error-handler])))))
+                                          (:write rw))}))))
 
 (def default-s3-rw
   ;; `edn/read` doesn't make use of the object size, so no reason to fetch it from S3 (we communicate that via metadata).
@@ -436,7 +433,7 @@
   ([creds bucket k lock initial-value]
    (s3-atom creds bucket k lock initial-value default-s3-rw))
   ([creds bucket k lock initial-value rw]
-   (map->Duratom (merge
+   (map->Duratom (merge rw
                    {:lock lock
                     :init initial-value
                     :make-backend (partial storage/->S3Backend
@@ -448,8 +445,7 @@
                                            k
                                            (:metadata rw)
                                            (:read rw)
-                                           (:write rw))}
-                   (select-keys rw [:commit-mode :error-handler])))))
+                                           (:write rw))}))))
 
 (def default-redis-rw
   {;; Redis library Carmine automatically uses Nippy for serialization/deserialization Clojure types
@@ -467,15 +463,14 @@
   ([db-config key-name lock initial-value]
    (redis-atom db-config key-name lock initial-value default-redis-rw))
   ([db-config key-name lock initial-value rw]
-   (map->Duratom (merge
+   (map->Duratom (merge rw
                    {:lock lock
                     :init initial-value
                     :make-backend (partial storage/->RedisBackend
                                            db-config
                                            key-name
                                            (:read rw)
-                                           (:write rw))}
-                   (select-keys rw [:commit-mode :error-handler])))))
+                                           (:write rw))}))))
 
 (def default-fileio-rw
   {:read  ut/read-edn-object
@@ -488,7 +483,7 @@
   ([http-post! key-duratom lock initial-value]
    (fileio-atom http-post! key-duratom lock initial-value default-fileio-rw))
   ([http-post! key-duratom lock initial-value rw]
-   (map->Duratom (merge
+   (map->Duratom (merge rw
                    {:lock lock
                     :init initial-value
                     :make-backend (partial storage/->FileIOBackend
@@ -496,8 +491,8 @@
                                            key-duratom
                                            (:read rw)
                                            (:write rw)
-                                           (:expiry rw "2w"))} ;; two weeks by default
-                   (select-keys rw [:commit-mode :error-handler])))))
+                                           (:expiry rw "2w"))})))) ;; two weeks by default
+
 
 (defmulti duratom
   "Top level constructor function for the <Duratom> class.

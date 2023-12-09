@@ -1,0 +1,38 @@
+name: Run all tests
+
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+
+jobs:
+
+  clojure:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # It is important to install java before installing clojure tools which needs java
+      # exclusions: babashka, clj-kondo and cljstyle
+      - name: Prepare java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'adopt'
+          java-version: '21'
+
+      - name: Install leiningen
+        uses: DeLaGuardo/setup-clojure@12.1
+        with:
+          lein: latest
+
+      - name: setup docker
+        uses: adambirds/docker-compose-action@v1.3.0
+        with:
+          compose-file: "./docker-compose.yml"
+          down-flags: "--volumes"
+          test-command: "lein test"
