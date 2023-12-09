@@ -35,5 +35,6 @@ jobs:
         with:
           compose-file: "./docker-compose.yml"
           down-flags: "--volumes"
-          test-container: duratom
-          test-command: "lein test"
+
+      - name: Run tests
+        run: lein test
