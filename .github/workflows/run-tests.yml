@@ -9,7 +9,7 @@ on:
 
 jobs:
 
-  clojure:
+  test:
 
     runs-on: ubuntu-latest
 
@@ -25,14 +25,15 @@ jobs:
           distribution: 'adopt'
           java-version: '21'
 
-      - name: Install leiningen
+      - name: Install Leiningen
         uses: DeLaGuardo/setup-clojure@12.1
         with:
           lein: latest
 
-      - name: setup docker
+      - name: Setup Docker
         uses: adambirds/docker-compose-action@v1.3.0
         with:
           compose-file: "./docker-compose.yml"
           down-flags: "--volumes"
+          test-container: duratom
           test-command: "lein test"
