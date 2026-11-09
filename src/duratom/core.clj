@@ -9,23 +9,44 @@
             [duratom.backends :as backends]
             [duratom.utils :as ut]))
 
+(defn- write!
+  "Persist (f old) and make it the state, under the state's lock so the read,
+  the write to the backend and the update are one step: two threads swapping at
+  once cannot both start from the same old value. Watchers run after the lock is
+  released. Returns the new value."
+  [dura f]
+  (let [state (:state dura)
+        [changed? new]
+        (locking state
+          (let [old @state
+                new (f old)]
+            (if (= old new)
+              [false new]
+              (do (backends/persist! (:backend dura) new)
+                  (reset! state new)
+                  [true new]))))]
+    (when changed?
+      (ratom/-notify-watches! dura))
+    new))
+
 (defrecord Duratom [backend state watches]
   ratom/IReactiveCell
   (-value [_] @state)
-  (-reset! [this v]
-    (let [changed?
-          (locking this
-            (let [old @state]
-              (when (not= old v)
-                (backends/persist! backend v)
-                (reset! state v)
-                true)))]
-      (when changed?
-        (ratom/-notify-watches! this))
-      v))
+  (-reset! [this v] (write! this (constantly v)) v)
   (-add-watch! [_ w] (swap! watches conj w))
   (-remove-watch! [_ w] (swap! watches disj w))
-  (-notify-watches! [this] (doseq [w @watches] (w this))))
+  (-notify-watches! [this] (doseq [w @watches] (w this)))
+  ratom/IAtomicSwap
+  (-swap! [this f] (write! this f)))
+
+(defn- stored-state
+  "[true v] when `backend` holds a value v (nil or false included), else nil."
+  [backend]
+  (let [v (backends/load-state backend)]
+    (when (if (satisfies? backends/StoredValue backend)
+            (backends/stored? backend)
+            (some? v))
+      [true v])))
 
 (defn make-duratom
   "Build a durable atom over `backend` (any `duratom.backends/StorageBackend`).
@@ -35,9 +56,14 @@
   (let [d (->Duratom backend
                      (clojure.core/atom nil)
                      (clojure.core/atom #{}))]
-    (if-let [stored (backends/load-state backend)]
+    (if-let [[_ stored] (stored-state backend)]
       (reset! (:state d) stored)
-      (reset! d (ut/->init init)))
+      (let [v (ut/->init init)]
+        ;; Persist unconditionally: -reset! skips a write that leaves the state
+        ;; unchanged, and the state starts at nil, so an init of nil would
+        ;; otherwise never reach the backend.
+        (backends/persist! backend v)
+        (reset! (:state d) v)))
     d))
 
 (defn file-atom

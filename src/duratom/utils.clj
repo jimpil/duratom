@@ -27,10 +27,15 @@
     (fs/move tmp path {:replace-existing true})
     path))
 
+(defn edn-file-present?
+  "True when `path` exists and is non-empty, so it holds a value (nil included)."
+  [path]
+  (and (fs/exists? path) (pos? (fs/size path))))
+
 (defn read-edn-file
   "Read one EDN value from `path`; nil when the file is absent or empty."
   [path]
-  (when (and (fs/exists? path) (pos? (fs/size path)))
+  (when (edn-file-present? path)
     (read-edn-string (slurp path))))
 
 (defn ->init

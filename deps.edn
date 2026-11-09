@@ -6,7 +6,7 @@
  ;; jolt automatically from the git dep.
  :deps {io.github.jolt-lang/glimmer
         {:git/url "https://github.com/jolt-lang/glimmer.git"
-         :git/sha "93758e82548daf75e357274558fc3e81bb754c9a"}
+         :git/sha "22350c4d047b05359a16b756b20f38ecb391a63b"}
         io.github.jolt-lang/db
         {:git/url "https://github.com/jolt-lang/db.git"
          :git/sha "a54cc49f9ee8b6f6b0a1dd4f695a5390fedb5bfc"}}

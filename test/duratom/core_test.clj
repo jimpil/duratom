@@ -82,3 +82,52 @@
       (finally
         (d/destroy a)
         (when (fs/exists? path) (fs/delete path))))))
+
+(deftest concurrent-swaps-lose-no-writes
+  (let [store (clojure.core/atom nil)
+        a (d/make-duratom (->MemBackend store) 0)
+        workers (doall (for [_ (range 8)]
+                         (future (dotimes [_ 200] (swap! a inc)))))]
+    (run! deref workers)
+    (is (= 1600 @a))
+    (is (= 1600 @store))))
+
+(deftest swap-returns-the-new-value-and-notifies
+  (let [a (d/make-duratom (->MemBackend (clojure.core/atom nil)) {:n 0})
+        sq (ratom/reaction (:n @a))]
+    (is (= 0 @sq))
+    (is (= {:n 1} (swap! a update :n inc)))
+    (is (= {:n 6} (swap! a update :n + 5)))
+    (is (= 6 @sq))))
+
+(deftest stored-nil-and-false-are-values
+  (testing "a stored false is not replaced by init"
+    (let [store (clojure.core/atom false)
+          a (d/make-duratom (->MemBackend store) :init)]
+      (is (= false @a))
+      (is (= false @store))))
+  (testing "file backend: a persisted nil or false survives a reload"
+    (doseq [v [nil false]]
+      (let [path (str (uniq "duratom-falsy") ".edn")
+            a (d/file-atom path :something)]
+        (try
+          (reset! a v)
+          (is (= v (d/backend-snapshot a)))
+          (let [a2 (d/file-atom path :init)]
+            (is (= v @a2)))
+          (finally
+            (d/destroy a)
+            (when (fs/exists? path) (fs/delete path)))))))
+  (testing "sql backend: a persisted nil or false survives a reload"
+    (doseq [v [nil false]]
+      (let [db-path (str (uniq "duratom-falsy-sql") ".db")
+            spec (str "sqlite:" db-path)
+            a (d/sql-atom spec "st" :something)]
+        (try
+          (reset! a v)
+          (let [a2 (d/sql-atom spec "st" :init)]
+            (is (= v @a2))
+            (b/close-backend (:backend a2)))
+          (finally
+            (d/destroy a)
+            (when (fs/exists? db-path) (fs/delete db-path))))))))

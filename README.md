@@ -10,8 +10,8 @@ change is written through to storage.
 
 ```clojure
 ;; deps.edn
-{:deps {io.github.jolt-lang/duratom
-        {:git/url "https://github.com/jolt-lang/duratom.git"
+{:deps {io.github.jlt-commons/duratom
+        {:git/url "https://github.com/jlt-commons/duratom.git"
          :git/sha "<full-sha>"}}}
 ```
 
@@ -76,12 +76,17 @@ seam for adding a new durable store — a key-value service, a remote API, …:
 ```
 
 `load-state` returning nil means "empty": `make-duratom` starts the atom at its
-`init` argument and persists it.
+`init` argument and persists it. A stored `false` is always a value. A backend
+that can store nil also implements `b/StoredValue` (`(stored? [_] ...)`, true
+when a value is present), so a persisted nil is not mistaken for empty; the file
+and SQL backends both do.
 
 ## Reactive integration with glimmer
 
 `Duratom` implements `glimmer.ratom/IReactiveCell`, so it composes with the rest
-of the reactive model:
+of the reactive model. It also implements `IAtomicSwap`, so `swap!` reads,
+persists and updates under one lock: concurrent swaps from several threads do
+not lose writes. That needs glimmer v0.1.7 or later.
 
 ```clojure
 (require '[glimmer.ratom :as r])

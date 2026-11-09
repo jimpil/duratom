@@ -17,6 +17,13 @@
   (clear! [backend]         "Remove the persisted value. Returns nil.")
   (close-backend [backend]  "Release backend-held resources. Returns nil."))
 
+(defprotocol StoredValue
+  "Optional. A backend that can persist nil implements this so a stored nil is
+  told apart from no value at all; load-state returns nil for both. Without it,
+  duratom.core treats a nil from load-state as nothing stored (false is always a
+  value)."
+  (stored? [backend] "True when the backend holds a persisted value, nil included."))
+
 ;; --- file backend -------------------------------------------------------------
 
 (defrecord FileBackend [path]
@@ -24,7 +31,9 @@
   (load-state [_] (ut/read-edn-file path))
   (persist! [_ v] (ut/write-edn-file path v))
   (clear! [_] (when (fs/exists? path) (fs/delete path)) nil)
-  (close-backend [_] nil))
+  (close-backend [_] nil)
+  StoredValue
+  (stored? [_] (ut/edn-file-present? path)))
 
 (defn file-backend
   "A backend that persists a single EDN value to `path` on the local filesystem."
@@ -49,7 +58,10 @@
     nil)
   (close-backend [_]
     (.close conn)
-    nil))
+    nil)
+  StoredValue
+  (stored? [_]
+    (some? (jdbc/fetch-one conn [(str "select id from " table " where id = ?") row-id]))))
 
 (defn sql-backend
   "A backend that persists a single EDN value to `table` (columns id, value) over
